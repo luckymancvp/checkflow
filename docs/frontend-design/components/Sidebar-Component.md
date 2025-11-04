@@ -13,7 +13,7 @@ The sidebar serves as the primary navigation component for the CheckFlow applica
 ## Layout States
 
 ### Expanded State
-```
+\`\`\`
 ┌─────────────────────────────────┐
 │ ┌─────┐ CheckFlow        [Hide] │
 │ │ [C] │ ⚡ Powered by PAMO       │
@@ -40,10 +40,10 @@ The sidebar serves as the primary navigation component for the CheckFlow applica
 │ │ [Logout]                    │ │
 │ └─────────────────────────────┘ │
 └─────────────────────────────────┘
-```
+\`\`\`
 
 ### Collapsed State
-```
+\`\`\`
 ┌─────────┐
 │ ┌─────┐ │
 │ │ [C] │ │ App logo
@@ -57,10 +57,10 @@ The sidebar serves as the primary navigation component for the CheckFlow applica
 ├─────────┤
 │   [A]   │ User avatar
 └─────────┘
-```
+\`\`\`
 
 ### Mobile Overlay State
-```
+\`\`\`
 ┌─────────────────────────────────┐
 │ ┌─────┐ CheckFlow        [✕]   │
 │ │ [C] │ ⚡ Powered by PAMO       │
@@ -77,7 +77,7 @@ The sidebar serves as the primary navigation component for the CheckFlow applica
 │ └───┘                           │
 │ [Logout]                        │
 └─────────────────────────────────┘
-```
+\`\`\`
 
 ## Component Structure
 
