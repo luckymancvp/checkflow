@@ -1,0 +1,929 @@
+"use client"
+
+import type React from "react"
+import { useState, useEffect, useRef } from "react"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
+import { LazyImage } from "@/components/ui/lazy-image"
+import { useApi } from "@/hooks/use-api"
+import { useImageCache } from "@/hooks/use-image-cache"
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  AlertTriangle,
+  Maximize,
+  Copy,
+  CheckCheck,
+  User,
+  ChevronDown,
+  Eye,
+  EyeOff,
+} from "lucide-react"
+import type { Order } from "@/types/order"
+import type {
+  OrderReviewModalProps,
+  ViewMode,
+  ActiveTab,
+  OrderHistoryResponse,
+  ProductHistoryResponse,
+  ProductTypeNoteResponse,
+} from "@/types/order-review"
+import { ImageViewer } from "./image-viewer"
+import { KeyboardShortcuts } from "./keyboard-shortcuts"
+import { OrderDetailsPanel } from "./order-details-panel"
+import { STORAGE_KEY, DEFAULT_WIDTHS } from "@/constants/review-modal"
+
+export function OrderReviewModal({
+  isOpen,
+  onClose,
+  order,
+  onAction,
+  onOrderNoteUpdate,
+  currentIndex,
+  totalCount,
+  selectedSheet,
+  onNext,
+  onPrevious,
+  onJumpToIndex,
+  availableStatuses,
+  onStatusUpdate,
+  reviewMode,
+}: OrderReviewModalProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>("tabs")
+  const [activeTab, setActiveTab] = useState<ActiveTab>("mockup")
+  const [zoom, setZoom] = useState(100)
+  const [orderNote, setOrderNote] = useState("")
+  const [repairType, setRepairType] = useState<"design_error" | "customer_change" | "">("")
+  const [showRepairOptions, setShowRepairOptions] = useState(false)
+  const [copiedItemId, setCopiedItemId] = useState(false)
+  const [copiedPersonalization, setCopiedPersonalization] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [rotation, setRotation] = useState(0)
+  const [panX, setPanX] = useState(0)
+  const [panY, setPanY] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [dragStartPan, setDragStartPan] = useState({ x: 0, y: 0 })
+  const [screenshotTaken, setScreenshotTaken] = useState(false)
+  const [currentStatus, setCurrentStatus] = useState<Order["status"]>(order.status)
+  const [columnWidths, setColumnWidths] = useState(DEFAULT_WIDTHS)
+  const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null)
+  const [startX, setStartX] = useState(0)
+  const [startWidths, setStartWidths] = useState(DEFAULT_WIDTHS)
+  const [showOrderNoteImages, setShowOrderNoteImages] = useState(false)
+  const [jumpItemId, setJumpItemId] = useState("")
+  const [jumpError, setJumpError] = useState("")
+  const imageContainerRef = useRef<HTMLDivElement>(null)
+  const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const { preloadOrderImages, getCachedImageUrl } = useImageCache()
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        setColumnWidths(parsed)
+      } catch (e) {
+        console.error("Failed to parse saved column widths:", e)
+      }
+    }
+  }, [])
+
+  const saveColumnWidths = (widths: typeof columnWidths) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(widths))
+    setColumnWidths(widths)
+  }
+
+  const handleMouseDown = (e: React.MouseEvent, side: "left" | "right") => {
+    e.preventDefault()
+    setIsResizing(side)
+    setStartX(e.clientX)
+    setStartWidths(columnWidths)
+  }
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return
+
+      const deltaX = e.clientX - startX
+      const containerWidth = window.innerWidth
+      const deltaPercent = (deltaX / containerWidth) * 100
+
+      if (isResizing === "left") {
+        const newLeftWidth = Math.max(15, Math.min(35, startWidths.left + deltaPercent))
+        saveColumnWidths({ ...columnWidths, left: newLeftWidth })
+      } else if (isResizing === "right") {
+        const newRightWidth = Math.max(20, Math.min(40, startWidths.right - deltaPercent))
+        saveColumnWidths({ ...columnWidths, right: newRightWidth })
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(null)
+    }
+
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove)
+      document.addEventListener("mouseup", handleMouseUp)
+      document.body.style.cursor = "col-resize"
+      document.body.style.userSelect = "none"
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseup", handleMouseUp)
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+    }
+  }, [isResizing, startX, startWidths, columnWidths])
+
+  const {
+    data: orderHistoryData,
+    loading: orderHistoryLoading,
+    error: orderHistoryError,
+  } = useApi<OrderHistoryResponse>(`/orders/${order.itemId}/history`)
+
+  const {
+    data: productHistoryData,
+    loading: productHistoryLoading,
+    error: productHistoryError,
+  } = useApi<ProductHistoryResponse>(
+    order.productType && selectedSheet?.google_sheet_id
+      ? `/orders/product-history/${order.productType}?google_sheet_id=${selectedSheet.google_sheet_id}`
+      : "",
+  )
+
+  const {
+    data: productTypeNoteData,
+    loading: productTypeNoteLoading,
+    error: productTypeNoteError,
+    refetch: refetchProductTypeNote,
+  } = useApi<ProductTypeNoteResponse>(
+    order.productType ? `/product-type-notes/${encodeURIComponent(order.productType)}` : "",
+  )
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen()
+      setIsFullscreen(true)
+    } else {
+      document.exitFullscreen()
+      setIsFullscreen(false)
+    }
+  }
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange)
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange)
+  }, [])
+
+  useEffect(() => {
+    const savedViewMode = localStorage.getItem("orderReviewViewMode") as ViewMode
+    if (savedViewMode) {
+      setViewMode(savedViewMode)
+    }
+  }, [])
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode)
+    localStorage.setItem("orderReviewViewMode", mode)
+  }
+
+  useEffect(() => {
+    setOrderNote(order.orderNote || "")
+    setRepairType("")
+    setShowRepairOptions(false)
+    setZoom(100)
+    setActiveTab("mockup")
+    setPanX(0)
+    setPanY(0)
+    setRotation(0)
+    setCurrentStatus(order.status) // Reset currentStatus to match the new order's actual status
+  }, [order.itemId, order.orderNote])
+
+  useEffect(() => {
+    if (!isOpen || !reviewMode || !order) return
+
+    const currentIndex = reviewMode.currentIndex
+    const nextIndex = currentIndex + 1
+
+    if (nextIndex < reviewMode.orders.length) {
+      const nextOrder = reviewMode.orders[nextIndex]
+      preloadOrderImages(nextOrder)
+    }
+  }, [isOpen, reviewMode, order, preloadOrderImages])
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getStatusChangeDisplay = (entry: any, prevEntry?: any) => {
+    if (!prevEntry) return `Order Created → ${entry.status}`
+    return `${prevEntry.status} → ${entry.status}`
+  }
+
+  const getStatusBadge = (status: Order["status"]) => {
+    switch (status) {
+      case "DESIGNED":
+        return (
+          <Badge className="bg-blue-50 text-blue-700 border-blue-200">
+            <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+            Designed
+          </Badge>
+        )
+      case "NEED_REPAIR":
+        return (
+          <Badge className="bg-red-50 text-red-700 border-red-200">
+            <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+            Need Repair
+          </Badge>
+        )
+      case "CONFIRMED":
+        return (
+          <Badge className="bg-green-50 text-green-700 border-green-200">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+            Confirmed
+          </Badge>
+        )
+      case "REPAIRED":
+        return (
+          <Badge className="bg-green-50 text-green-700 border-green-200">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+            Repaired
+          </Badge>
+        )
+      case "WAITING CUSTOMER":
+        return (
+          <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+            Waiting Customer
+          </Badge>
+        )
+      default:
+        return <Badge variant="secondary">{status}</Badge>
+    }
+  }
+
+  const getImageUrl = (url: string | null, imageType: "design" | "mockup" | "other"): string | null => {
+    if (!url) return null
+    // Return original URL - cache system will handle Google Drive links
+    return url
+  }
+
+  const handleDirectRepair = (type: "design_error" | "customer_change") => {
+    const currentNoteValue = orderNoteTextareaRef.current?.value || ""
+    const noteChanged = currentNoteValue !== (order.orderNote || "")
+    const noteToSend = noteChanged ? currentNoteValue : order.orderNote
+    onAction("need_repair", type, noteToSend)
+  }
+
+  const handleConfirm = () => {
+    const currentNoteValue = orderNoteTextareaRef.current?.value || ""
+    const noteChanged = currentNoteValue !== (order.orderNote || "")
+    const noteToSend = noteChanged ? currentNoteValue : order.orderNote
+    onAction("confirm", undefined, noteToSend)
+  }
+
+  const handleCopyItemId = async () => {
+    try {
+      await navigator.clipboard.writeText(order.itemId)
+      setCopiedItemId(true)
+      setTimeout(() => setCopiedItemId(false), 2000)
+    } catch (error) {
+      console.error("Failed to copy item ID:", error)
+    }
+  }
+
+  const handleCopyPersonalization = async () => {
+    if (!order.personalization) return
+    try {
+      await navigator.clipboard.writeText(order.personalization)
+      setCopiedPersonalization(true)
+      setTimeout(() => setCopiedPersonalization(false), 3000)
+    } catch (error) {
+      console.error("Failed to copy personalization:", error)
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const isProduction = process.env.NODE_ENV === "production"
+    if (!isProduction) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLTextAreaElement) return
+
+      switch (e.key) {
+        case "1":
+          e.preventDefault()
+          handleConfirm()
+          break
+        case "r":
+        case "R":
+          e.preventDefault()
+          setRotation((prev) => (prev + 90) % 360)
+          break
+        case "s":
+        case "S":
+          e.preventDefault()
+          handleScreenshot()
+          break
+        case "a":
+        case "A":
+          e.preventDefault()
+          handleCopyItemId()
+          break
+        case " ":
+          e.preventDefault()
+          if (e.shiftKey) {
+            onPrevious()
+          } else {
+            onNext()
+          }
+          break
+        case "Escape":
+          e.preventDefault()
+          if (showRepairOptions) {
+            setShowRepairOptions(false)
+          } else {
+            onClose()
+          }
+          break
+        case "m":
+        case "M":
+          e.preventDefault()
+          setActiveTab("mockup")
+          break
+        case "d":
+        case "D":
+          e.preventDefault()
+          setActiveTab("design")
+          break
+        case "p":
+        case "P":
+          e.preventDefault()
+          setActiveTab("product")
+          break
+        case "i":
+        case "I":
+          e.preventDefault()
+          setActiveTab("customer")
+          break
+        case "f":
+        case "F":
+          e.preventDefault()
+          toggleFullscreen()
+          break
+        case "h":
+        case "H":
+          e.preventDefault()
+          scrollToProductHistory()
+          break
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [isOpen, showRepairOptions, viewMode, onNext, onPrevious, onClose])
+
+  const handleNeedRepair = () => {
+    if (!repairType) return
+    const noteChanged = orderNote !== (order.orderNote || "")
+    onAction("need_repair")
+    setShowRepairOptions(false)
+  }
+
+  const scrollToProductHistory = () => {
+    const element = document.getElementById("product-history-section")
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }
+
+  const handleStatusChange = (newStatus: string) => {
+    const typedStatus = newStatus as Order["status"]
+
+    if (typedStatus === currentStatus) {
+      return // No change needed
+    }
+
+    setCurrentStatus(typedStatus)
+
+    if (typedStatus === "NEED_REPAIR") {
+      // Show modal to select change type
+      // setSelectedNewStatus(typedStatus)
+      // setStatusChangeNote(order.orderNote || "")
+      // setStatusChangeType(null)
+      // setShowStatusChangeModal(true)
+    } else {
+      const noteChanged = orderNote !== (order.orderNote || "")
+      const noteToUpdate = noteChanged ? orderNote : order.orderNote
+      onStatusUpdate(typedStatus, noteToUpdate)
+    }
+  }
+
+  const handleConfirmStatusChange = () => {
+    // if (!selectedNewStatus) return
+    // if (selectedNewStatus === "NEED_REPAIR" && !statusChangeType) {
+    //   return // Change type is required for NEED_REPAIR
+    // }
+    // onStatusUpdate(selectedNewStatus, statusChangeNote, statusChangeType || undefined)
+    // setShowStatusChangeModal(false)
+    // setSelectedNewStatus(null)
+    // setStatusChangeNote("")
+    // setStatusChangeType(null)
+  }
+
+  const handleCancelStatusChange = () => {
+    // setCurrentStatus(order.status)
+    // setShowStatusChangeModal(false)
+    // setSelectedNewStatus(null)
+    // setStatusChangeNote("")
+    // setStatusChangeType(null)
+  }
+
+  const handleScreenshot = async () => {
+    if (!imageContainerRef.current) return
+
+    try {
+      const canvas = document.createElement("canvas")
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return
+
+      const container = imageContainerRef.current
+      const containerRect = container.getBoundingClientRect()
+
+      // Find the image element
+      const imgElement = container.querySelector("img")
+      if (!imgElement) return
+
+      // Get the actual rendered image dimensions and position
+      const imgRect = imgElement.getBoundingClientRect()
+
+      const visibleLeft = Math.max(containerRect.left, imgRect.left)
+      const visibleTop = Math.max(containerRect.top, imgRect.top)
+      const visibleRight = Math.min(containerRect.right, imgRect.right)
+      const visibleBottom = Math.min(containerRect.bottom, imgRect.bottom)
+
+      const visibleWidth = Math.max(0, visibleRight - visibleLeft)
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop)
+
+      // Set canvas size to match only the visible area
+      canvas.width = visibleWidth
+      canvas.height = visibleHeight
+
+      // Create a new image to draw on canvas
+      const img = new Image()
+      img.crossOrigin = "anonymous"
+
+      img.onload = () => {
+        const scaleX = img.naturalWidth / imgRect.width
+        const scaleY = img.naturalHeight / imgRect.height
+
+        const sourceX = (visibleLeft - imgRect.left) * scaleX
+        const sourceY = (visibleTop - imgRect.top) * scaleY
+        const sourceWidth = visibleWidth * scaleX
+        const sourceHeight = visibleHeight * scaleY
+
+        // Draw only the visible portion of the image
+        ctx.drawImage(
+          img,
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight, // Source rectangle
+          0,
+          0,
+          visibleWidth,
+          visibleHeight, // Destination rectangle
+        )
+
+        // Convert canvas to blob and copy to clipboard
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            try {
+              await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+
+              // Show animation
+              setScreenshotTaken(true)
+              setTimeout(() => setScreenshotTaken(false), 1000)
+            } catch (error) {
+              console.error("Failed to copy screenshot to clipboard:", error)
+            }
+          }
+        }, "image/png")
+      }
+
+      img.src = imgElement.src
+    } catch (error) {
+      console.error("Failed to take screenshot:", error)
+    }
+  }
+
+  const extractImageUrls = (content: string) => {
+    if (!content) return []
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const urls = content.match(urlRegex) || []
+    return urls.filter((url) => /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url))
+  }
+
+  const handleOpenAllImages = () => {
+    // const imageUrls = extractImageUrls(productTypeNote)
+    // imageUrls.forEach((url) => {
+    //   window.open(url, "_blank")
+    // })
+  }
+
+  const handleSaveProductNote = async () => {
+    // if (!order.productType) return
+    // setProductNoteLoading(true)
+    // try {
+    //   const response = await fetch(`/api/product-type-notes/${encodeURIComponent(order.productType)}`, {
+    //     method: "POST",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //     },
+    //     body: JSON.stringify({
+    //       content: productTypeNote,
+    //     }),
+    //   })
+    //   if (response.ok) {
+    //     setIsEditingProductNote(false)
+    //     refetchProductTypeNote()
+    //   } else {
+    //     console.error("Failed to save product type note")
+    //   }
+    // } catch (error) {
+    //   console.error("Error saving product type note:", error)
+    // } finally {
+    //   setProductNoteLoading(false)
+    // }
+  }
+
+  const handleCancelEditProductNote = () => {
+    // setProductTypeNote(productTypeNoteData?.data?.content || "")
+    // setIsEditingProductNote(false)
+  }
+
+  const handleJumpToOrder = () => {
+    if (!jumpItemId.trim() || !reviewMode) {
+      setJumpError("Please enter an item ID")
+      return
+    }
+
+    const targetIndex = reviewMode.orders.findIndex((o) => o.itemId.toLowerCase() === jumpItemId.trim().toLowerCase())
+
+    if (targetIndex === -1) {
+      setJumpError("Order not found in current list")
+      return
+    }
+
+    // Clear error and input
+    setJumpError("")
+    setJumpItemId("")
+
+    // Jump directly to the target order using the parent's handler
+    onJumpToIndex(targetIndex)
+  }
+
+  const handleJumpKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      handleJumpToOrder()
+    } else if (e.key === "Escape") {
+      setJumpItemId("")
+      setJumpError("")
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900">#{order.itemId}</h2>
+              <Button variant="ghost" size="sm" onClick={handleCopyItemId} className="h-6 w-6 p-0 hover:bg-gray-100">
+                {copiedItemId ? (
+                  <CheckCheck className="h-3 w-3 text-green-600" />
+                ) : (
+                  <Copy className="h-3 w-3 text-gray-500" />
+                )}
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={currentStatus} onValueChange={handleStatusChange}>
+                <SelectTrigger className="h-7 w-auto min-w-[120px] border-0 bg-transparent p-0 focus:ring-0">
+                  <div className="flex items-center">
+                    {getStatusBadge(currentStatus)}
+                    <ChevronDown className="h-3 w-3 ml-1 text-gray-400" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {[...availableStatuses, "WAITING CUSTOMER", "REPAIRED"]
+                    .filter((status, index, arr) => arr.indexOf(status) === index)
+                    .sort()
+                    .map((status) => (
+                      <SelectItem key={status} value={status}>
+                        <div className="flex items-center gap-2">{getStatusBadge(status as Order["status"])}</div>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <span className="text-sm text-gray-500">
+              {currentIndex + 1}/{totalCount}
+            </span>
+
+            {/* Jump to order input */}
+            <div className="flex items-center gap-2 ml-4 border-l pl-4 border-gray-200">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={jumpItemId}
+                  onChange={(e) => {
+                    setJumpItemId(e.target.value)
+                    setJumpError("")
+                  }}
+                  onKeyDown={handleJumpKeyDown}
+                  placeholder="Jump to Item ID..."
+                  className="h-7 px-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-72"
+                />
+                {jumpError && (
+                  <div className="absolute top-full left-0 mt-1 text-xs text-red-600 whitespace-nowrap bg-white px-2 py-1 rounded shadow-sm border border-red-200">
+                    {jumpError}
+                  </div>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleJumpToOrder}
+                className="h-7 px-2 text-xs bg-transparent"
+                title="Jump to order by Item ID"
+              >
+                Go
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen (F)">
+              <Maximize className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={onPrevious} disabled={currentIndex === 0}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={onNext} disabled={currentIndex === totalCount - 1}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex h-[calc(100vh-60px)] overflow-hidden">
+          {/* Left Panel - Controls */}
+          <div
+            className="border-r border-gray-200 bg-gray-50 overflow-y-auto relative"
+            style={{ width: `${columnWidths.left}%` }}
+          >
+            <div
+              className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500 hover:w-1.5 transition-all z-10"
+              onMouseDown={(e) => handleMouseDown(e, "left")}
+              title="Drag to resize"
+            />
+
+            <div className="p-4 space-y-4">
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-gray-600">View:</span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => handleViewModeChange("tabs")}
+                    className={`px-2 py-1 rounded text-xs transition-colors ${
+                      viewMode === "tabs" ? "bg-blue-100 text-blue-700" : "bg-white text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    Tabs
+                  </button>
+                  <button
+                    onClick={() => handleViewModeChange("stack")}
+                    className={`px-2 py-1 rounded text-xs transition-colors ${
+                      viewMode === "stack" ? "bg-blue-100 text-blue-700" : "bg-white text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    Stack
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Button */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleConfirm}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm py-2 shadow-sm transition-all duration-200 hover:shadow-md"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  CONFIRM (1)
+                </Button>
+              </div>
+
+              {/* Order Note Section */}
+              <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-semibold text-purple-900">1. Order Note</h3>
+                  {extractImageUrls(orderNote).length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowOrderNoteImages(!showOrderNoteImages)}
+                      className="h-5 w-5 p-0 hover:bg-purple-100"
+                      title={showOrderNoteImages ? "Hide images" : "Show images"}
+                    >
+                      {showOrderNoteImages ? (
+                        <EyeOff className="h-3 w-3 text-purple-700" />
+                      ) : (
+                        <Eye className="h-3 w-3 text-purple-700" />
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <Textarea
+                  ref={orderNoteTextareaRef}
+                  value={orderNote}
+                  onChange={(e) => setOrderNote(e.target.value)}
+                  placeholder="Add or edit order note..."
+                  className="min-h-[60px] text-xs bg-white"
+                />
+                {showOrderNoteImages && extractImageUrls(orderNote).length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-purple-700 font-medium">Images in note:</p>
+                    <div className="space-y-2">
+                      {extractImageUrls(orderNote).map((url, index) => (
+                        <div key={index} className="relative">
+                          <LazyImage
+                            src={url}
+                            alt={`Order note image ${index + 1}`}
+                            className="w-full h-auto object-contain rounded border border-purple-200 cursor-pointer"
+                            onClick={() => window.open(url, "_blank")}
+                            fallbackSrc="/placeholder.svg?height=200&width=200&text=Image"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {orderNote !== (order.orderNote || "") && (
+                  <p className="text-xs text-purple-600 italic mt-2">* Order note has been modified</p>
+                )}
+              </div>
+
+              {/* Personalization */}
+              {order.personalization && (
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-xs font-semibold text-blue-900">2. Personalization</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyPersonalization}
+                      className="h-5 w-5 p-0 hover:bg-blue-100"
+                      title="Copy personalization text"
+                    >
+                      {copiedPersonalization ? (
+                        <CheckCheck className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <Copy className="h-3 w-3 text-blue-700" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-blue-800 leading-relaxed whitespace-pre-wrap">{order.personalization}</p>
+                </div>
+              )}
+
+              {/* Customer Image */}
+              {order.customerImage && (
+                <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                  <h3 className="text-xs font-semibold text-green-900 mb-2">3. Customer Image</h3>
+                  <div className="w-full">
+                    <LazyImage
+                      src={getCachedImageUrl(order.customerImage) || order.customerImage}
+                      alt="Customer Reference"
+                      className="w-full h-auto object-contain rounded border border-green-200 cursor-pointer"
+                      onClick={() => window.open(order.customerImage, "_blank")}
+                      fallbackSrc="/placeholder.svg?height=200&width=200&text=Customer+Image"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Design Error and Customer Change buttons */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleDirectRepair("design_error")}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-2 shadow-sm transition-all duration-200 hover:shadow-md"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  DESIGN ERROR
+                </Button>
+                <Button
+                  onClick={() => handleDirectRepair("customer_change")}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white text-sm py-2 shadow-sm transition-all duration-200 hover:shadow-md"
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  CUSTOMER
+                </Button>
+              </div>
+
+              <KeyboardShortcuts />
+            </div>
+          </div>
+
+          {/* Center Panel - Image Viewer */}
+          <div
+            className="flex flex-col overflow-hidden relative"
+            style={{ width: `${100 - columnWidths.left - columnWidths.right}%` }}
+          >
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 h-full" ref={imageContainerRef}>
+                <ImageViewer
+                  order={order}
+                  viewMode={viewMode}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  zoom={zoom}
+                  setZoom={setZoom}
+                  rotation={rotation}
+                  setRotation={setRotation}
+                  panX={panX}
+                  setPanX={setPanX}
+                  panY={panY}
+                  setPanY={setPanY}
+                  isDragging={isDragging}
+                  setIsDragging={setIsDragging}
+                  dragStart={dragStart}
+                  setDragStart={setDragStart}
+                  dragStartPan={dragStartPan}
+                  setDragStartPan={setDragStartPan}
+                  screenshotTaken={screenshotTaken}
+                  setScreenshotTaken={setScreenshotTaken}
+                  getCachedImageUrl={getCachedImageUrl}
+                  onScreenshot={handleScreenshot}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel - Order Details */}
+          <div
+            className="border-l border-gray-200 bg-white overflow-y-auto relative"
+            style={{ width: `${columnWidths.right}%` }}
+          >
+            <div
+              className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-blue-500 hover:w-1.5 transition-all z-10"
+              onMouseDown={(e) => handleMouseDown(e, "right")}
+              title="Drag to resize"
+            />
+
+            <OrderDetailsPanel
+              order={order}
+              currentStatus={currentStatus}
+              orderHistoryData={orderHistoryData}
+              orderHistoryLoading={orderHistoryLoading}
+              orderHistoryError={orderHistoryError}
+              productHistoryData={productHistoryData}
+              productHistoryLoading={productHistoryLoading}
+              productHistoryError={productHistoryError}
+              productTypeNoteData={productTypeNoteData}
+              productTypeNoteLoading={productTypeNoteLoading}
+              productTypeNoteError={productTypeNoteError}
+              refetchProductTypeNote={refetchProductTypeNote}
+              getCachedImageUrl={getCachedImageUrl}
+            />
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
