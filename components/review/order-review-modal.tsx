@@ -49,7 +49,6 @@ export function OrderReviewModal({
   selectedSheet,
   onNext,
   onPrevious,
-  onJumpToIndex,
   availableStatuses,
   onStatusUpdate,
   reviewMode,
@@ -76,8 +75,6 @@ export function OrderReviewModal({
   const [startX, setStartX] = useState(0)
   const [startWidths, setStartWidths] = useState(DEFAULT_WIDTHS)
   const [showOrderNoteImages, setShowOrderNoteImages] = useState(false)
-  const [jumpItemId, setJumpItemId] = useState("")
-  const [jumpError, setJumpError] = useState("")
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -283,7 +280,10 @@ export function OrderReviewModal({
 
   const getImageUrl = (url: string | null, imageType: "design" | "mockup" | "other"): string | null => {
     if (!url) return null
-    // Return original URL - cache system will handle Google Drive links
+
+    if (url.includes("drive.google.com")) {
+      return `https://go.pamoteam.top/ggdrive?url=${encodeURIComponent(url)}`
+    }
     return url
   }
 
@@ -386,6 +386,11 @@ export function OrderReviewModal({
         case "I":
           e.preventDefault()
           setActiveTab("customer")
+          break
+        case "v":
+        case "V":
+          e.preventDefault()
+          handleViewModeChange(viewMode === "tabs" ? "stack" : "tabs")
           break
         case "f":
         case "F":
@@ -583,37 +588,6 @@ export function OrderReviewModal({
     // setIsEditingProductNote(false)
   }
 
-  const handleJumpToOrder = () => {
-    if (!jumpItemId.trim() || !reviewMode) {
-      setJumpError("Please enter an item ID")
-      return
-    }
-
-    const targetIndex = reviewMode.orders.findIndex((o) => o.itemId.toLowerCase() === jumpItemId.trim().toLowerCase())
-
-    if (targetIndex === -1) {
-      setJumpError("Order not found in current list")
-      return
-    }
-
-    // Clear error and input
-    setJumpError("")
-    setJumpItemId("")
-
-    // Jump directly to the target order using the parent's handler
-    onJumpToIndex(targetIndex)
-  }
-
-  const handleJumpKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      handleJumpToOrder()
-    } else if (e.key === "Escape") {
-      setJumpItemId("")
-      setJumpError("")
-    }
-  }
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
@@ -640,8 +614,8 @@ export function OrderReviewModal({
                 </SelectTrigger>
                 <SelectContent>
                   {[...availableStatuses, "WAITING CUSTOMER", "REPAIRED"]
-                    .filter((status, index, arr) => arr.indexOf(status) === index)
-                    .sort()
+                    .filter((status, index, arr) => arr.indexOf(status) === index) // Remove duplicates
+                    .sort() // Sort alphabetically
                     .map((status) => (
                       <SelectItem key={status} value={status}>
                         <div className="flex items-center gap-2">{getStatusBadge(status as Order["status"])}</div>
@@ -653,37 +627,6 @@ export function OrderReviewModal({
             <span className="text-sm text-gray-500">
               {currentIndex + 1}/{totalCount}
             </span>
-
-            {/* Jump to order input */}
-            <div className="flex items-center gap-2 ml-4 border-l pl-4 border-gray-200">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={jumpItemId}
-                  onChange={(e) => {
-                    setJumpItemId(e.target.value)
-                    setJumpError("")
-                  }}
-                  onKeyDown={handleJumpKeyDown}
-                  placeholder="Jump to Item ID..."
-                  className="h-7 px-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-72"
-                />
-                {jumpError && (
-                  <div className="absolute top-full left-0 mt-1 text-xs text-red-600 whitespace-nowrap bg-white px-2 py-1 rounded shadow-sm border border-red-200">
-                    {jumpError}
-                  </div>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleJumpToOrder}
-                className="h-7 px-2 text-xs bg-transparent"
-                title="Jump to order by Item ID"
-              >
-                Go
-              </Button>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">

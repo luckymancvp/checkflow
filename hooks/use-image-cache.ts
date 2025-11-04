@@ -3,31 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { Order } from "@/types/order"
 import { getImageUrl } from "@/utils/image-utils"
-import { googleSheetsClient } from "@/lib/google-sheets-client"
-import { GoogleDriveClient } from "@/lib/google-drive-client"
 
 export function useImageCache() {
   const [imageCache, setImageCache] = useState<Map<string, string>>(new Map())
   const blobUrlsRef = useRef<Set<string>>(new Set())
-
-  const isGoogleDriveUrl = (url: string): boolean => {
-    return url.includes("drive.google.com")
-  }
-
-  const fetchGoogleDriveFile = async (url: string): Promise<string> => {
-    try {
-      // Get access token from Google Sheets client (same token works for Drive API)
-      const accessToken = await googleSheetsClient.getValidAccessToken()
-
-      const driveClient = new GoogleDriveClient({ accessToken })
-      const objectUrl = await driveClient.fetchFileAsObjectUrl(url)
-
-      return objectUrl
-    } catch (error) {
-      console.error("[useImageCache] Failed to fetch Google Drive file:", error)
-      throw error
-    }
-  }
 
   const preloadOrderImages = useCallback(
     async (orderToPreload: Order) => {
@@ -35,17 +14,23 @@ export function useImageCache() {
 
       if (!mockupUrl) return
 
-      if (!isGoogleDriveUrl(mockupUrl)) return
+      // Only preload if it's a slow-loading URL
+      if (!mockupUrl.startsWith("https://go.pamoteam.top/")) return
 
       console.log(`[v0] Preloading mockup image for next order:`, orderToPreload.itemId)
 
       if (!imageCache.has(mockupUrl)) {
         try {
-          const objectUrl = await fetchGoogleDriveFile(mockupUrl)
+          const response = await fetch(mockupUrl)
+          if (response.ok) {
+            const blob = await response.blob()
+            const objectUrl = URL.createObjectURL(blob)
 
-          blobUrlsRef.current.add(objectUrl)
-          setImageCache((prev) => new Map(prev).set(mockupUrl, objectUrl))
-          console.log(`[v0] Cached mockup image for order ${orderToPreload.itemId}`)
+            blobUrlsRef.current.add(objectUrl)
+
+            setImageCache((prev) => new Map(prev).set(mockupUrl, objectUrl))
+            console.log(`[v0] Cached mockup image for order ${orderToPreload.itemId} ${mockupUrl} ${objectUrl}`)
+          }
         } catch (error) {
           console.log(`[v0] Failed to cache mockup image for order ${orderToPreload.itemId}:`, error)
         }
@@ -60,7 +45,7 @@ export function useImageCache() {
 
       const cachedUrl = imageCache.get(originalUrl) || null
 
-      if (isGoogleDriveUrl(originalUrl)) {
+      if (originalUrl.startsWith("https://go.pamoteam.top")) {
         /*if (cachedUrl) {
           console.log("ImageCache hit:", { originalUrl, cachedUrl })
         } else {
@@ -81,12 +66,11 @@ export function useImageCache() {
       })
       blobUrlsRef.current.clear()
     }
-  }, [])
+  }, []) // Removed imageCache dependency to prevent premature cleanup
 
   return {
     imageCache,
     preloadOrderImages,
     getCachedImageUrl,
-    fetchGoogleDriveFile, // Export for on-demand fetching
   }
 }

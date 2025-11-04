@@ -6,11 +6,10 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MessageSquare, Bell, BellOff, ChevronDown, ChevronUp, Loader2 } from "lucide-react"
+import { MessageSquare, Bell, BellOff, ChevronDown, ChevronUp } from "lucide-react"
 import { useOrderComments } from "@/hooks/use-order-comments"
 import { formatDistanceToNow } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
-import { uploadImageToS3, extractImageUrls } from "@/lib/s3-upload"
 
 interface OrderCommentsProps {
   itemId: string
@@ -23,10 +22,7 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [hasLoadedComments, setHasLoadedComments] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
   const commentsEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     setIsExpanded(false)
@@ -65,53 +61,6 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
     }
   }
 
-  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData?.items
-    if (!items) return
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-
-      if (item.type.indexOf("image") !== -1) {
-        e.preventDefault()
-        const file = item.getAsFile()
-        if (!file) continue
-
-        try {
-          setUploadingImage(true)
-          setUploadProgress(0)
-
-          const imageUrl = await uploadImageToS3(file, (progress) => {
-            setUploadProgress(progress.percentage)
-          })
-
-          // Insert image URL at cursor position
-          const textarea = textareaRef.current
-          if (textarea) {
-            const start = textarea.selectionStart
-            const end = textarea.selectionEnd
-            const newText = commentText.substring(0, start) + imageUrl + "\n" + commentText.substring(end)
-            setCommentText(newText)
-
-            // Set cursor position after the inserted URL
-            setTimeout(() => {
-              textarea.selectionStart = textarea.selectionEnd = start + imageUrl.length + 1
-              textarea.focus()
-            }, 0)
-          } else {
-            setCommentText((prev) => prev + "\n" + imageUrl)
-          }
-        } catch (error) {
-          console.error("[OrderComments] Image upload failed:", error)
-          alert("Failed to upload image. Please try again.")
-        } finally {
-          setUploadingImage(false)
-          setUploadProgress(0)
-        }
-      }
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -146,61 +95,6 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
       .join("")
       .toUpperCase()
       .substring(0, 2)
-  }
-
-  const renderCommentContent = (text: string) => {
-    const imageUrls = extractImageUrls(text)
-
-    if (imageUrls.length === 0) {
-      return <p className="text-xs text-gray-700 whitespace-pre-wrap break-words">{text}</p>
-    }
-
-    const parts: React.ReactNode[] = []
-    let lastIndex = 0
-
-    imageUrls.forEach((url, index) => {
-      const urlIndex = text.indexOf(url, lastIndex)
-
-      // Add text before the URL
-      if (urlIndex > lastIndex) {
-        const textBefore = text.substring(lastIndex, urlIndex)
-        if (textBefore.trim()) {
-          parts.push(
-            <p key={`text-${index}`} className="text-xs text-gray-700 whitespace-pre-wrap break-words mb-2">
-              {textBefore}
-            </p>,
-          )
-        }
-      }
-
-      // Add image
-      parts.push(
-        <img
-          key={`img-${index}`}
-          src={url || "/placeholder.svg"}
-          alt="Comment attachment"
-          className="max-w-full h-auto rounded-lg border border-gray-200 my-2"
-          style={{ maxHeight: "300px" }}
-          loading="lazy"
-        />,
-      )
-
-      lastIndex = urlIndex + url.length
-    })
-
-    // Add remaining text after last URL
-    if (lastIndex < text.length) {
-      const textAfter = text.substring(lastIndex)
-      if (textAfter.trim()) {
-        parts.push(
-          <p key="text-end" className="text-xs text-gray-700 whitespace-pre-wrap break-words mt-2">
-            {textAfter}
-          </p>,
-        )
-      }
-    }
-
-    return <div className="space-y-1">{parts}</div>
   }
 
   const sortedComments = [...comments].sort(
@@ -268,35 +162,24 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
                           {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      {renderCommentContent(comment.comment_text)}
+                      <p className="text-xs text-gray-700 whitespace-pre-wrap break-words">{comment.comment_text}</p>
                     </div>
                   </div>
                 ))
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-2">
-              {uploadingImage && (
-                <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>Uploading image... {uploadProgress}%</span>
-                </div>
-              )}
-
+            <form onSubmit={handleSubmit}>
               <Textarea
-                ref={textareaRef}
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
                 placeholder={
-                  user
-                    ? "Add a comment... (Press Enter to send, Shift+Enter for new line, paste images directly)"
-                    : "Please log in to comment"
+                  user ? "Add a comment... (Press Enter to send, Shift+Enter for new line)" : "Please log in to comment"
                 }
                 rows={3}
                 className="text-xs border-gray-200 focus:border-blue-300 focus:ring-blue-200 resize-none"
-                disabled={submitting || !user || uploadingImage}
+                disabled={submitting || !user}
               />
             </form>
           </>

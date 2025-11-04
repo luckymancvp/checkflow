@@ -170,14 +170,6 @@ export default function ReviewPage() {
     })
   }
 
-  const handleJumpToIndex = (index: number) => {
-    if (!reviewMode || index < 0 || index >= reviewMode.orders.length) return
-    setReviewMode({
-      ...reviewMode,
-      currentIndex: index,
-    })
-  }
-
   const handleReviewAction = async (
     action: "confirm" | "need_repair" | "skip",
     repairType?: "design_error" | "customer_change",
@@ -333,7 +325,6 @@ export default function ReviewPage() {
             onClose={handleReviewClose}
             onNext={handleReviewNext}
             onPrevious={handleReviewPrevious}
-            onJumpToIndex={handleJumpToIndex}
             onAction={handleReviewAction}
             availableStatuses={filterOptions.statuses}
             onStatusUpdate={handleStatusUpdate}

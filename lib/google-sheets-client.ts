@@ -127,7 +127,7 @@ class GoogleSheetsClient {
   }
 
   // Get valid access token (refresh if needed)
-  async getValidAccessToken(): Promise<string> {
+  private async getValidAccessToken(): Promise<string> {
     if (!this.tokens) {
       console.log("[GoogleSheetsClient] No tokens cached, fetching from server...")
       this.tokens = await this.fetchTokensFromServer()

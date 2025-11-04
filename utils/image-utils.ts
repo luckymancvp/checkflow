@@ -1,6 +1,9 @@
 export const getImageUrl = (url: string | null, imageType: "design" | "mockup" | "other"): string | null => {
   if (!url) return null
-  // Return original URL - Google Drive links will be handled by the cache system
+
+  if (url.includes("drive.google.com")) {
+    return `https://go.pamoteam.top/ggdrive?url=${encodeURIComponent(url)}`
+  }
   return url
 }
 
