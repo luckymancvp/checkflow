@@ -32,7 +32,6 @@ export function LazyImage({
   const [resolvedSrc, setResolvedSrc] = useState<string>(src)
   const [isResolvingSrc, setIsResolvingSrc] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
-  const blobUrlRef = useRef<string | null>(null)
   const fetchInitiatedRef = useRef<boolean>(false)
 
   const isGoogleDriveUrl = (url: string): boolean => {
@@ -53,7 +52,6 @@ export function LazyImage({
         const driveClient = new GoogleDriveClient({ accessToken })
         const objectUrl = await driveClient.fetchFileAsObjectUrl(src)
 
-        blobUrlRef.current = objectUrl
         setResolvedSrc(objectUrl)
         console.log("[v0] LazyImage: Successfully resolved", src)
       } catch (error) {
@@ -77,13 +75,7 @@ export function LazyImage({
     }
   }, [src])
 
-  useEffect(() => {
-    return () => {
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current)
-      }
-    }
-  }, [])
+  // This allows blob URLs to persist when modal closes and reopens
 
   useEffect(() => {
     const observer = new IntersectionObserver(

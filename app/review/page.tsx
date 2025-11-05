@@ -43,7 +43,6 @@ export default function ReviewPage() {
     isActive: boolean
     currentIndex: number
     orders: Order[]
-    startTimestamp: number
   } | null>(null)
 
   const [isLoadingNewSheet, setIsLoadingNewSheet] = useState(false)
@@ -148,7 +147,6 @@ export default function ReviewPage() {
       isActive: true,
       currentIndex: 0,
       orders: orders,
-      startTimestamp: Date.now(),
     })
   }
 
@@ -344,7 +342,6 @@ export default function ReviewPage() {
             syncError={syncError}
             onManualSync={triggerManualSync}
             reviewMode={reviewMode}
-            cacheKey={reviewMode.startTimestamp}
           />
         )}
       </div>

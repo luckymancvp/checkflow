@@ -53,7 +53,6 @@ export function OrderReviewModal({
   availableStatuses,
   onStatusUpdate,
   reviewMode,
-  cacheKey, // Added cacheKey prop to force cache refresh
 }: OrderReviewModalProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("tabs")
   const [activeTab, setActiveTab] = useState<ActiveTab>("mockup")
@@ -82,7 +81,7 @@ export function OrderReviewModal({
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const { preloadOrderImages, getCachedImageUrl } = useImageCache(cacheKey)
+  const { preloadOrderImages, getCachedImageUrl } = useImageCache()
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)

@@ -1,27 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useCallback, useRef } from "react"
 import type { Order } from "@/types/order"
 import { getImageUrl } from "@/utils/image-utils"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import { GoogleDriveClient } from "@/lib/google-drive-client"
 
-export function useImageCache(cacheKey?: number) {
+export function useImageCache() {
   const [imageCache, setImageCache] = useState<Map<string, string>>(new Map())
   const blobUrlsRef = useRef<Set<string>>(new Set())
-
-  useEffect(() => {
-    if (cacheKey !== undefined) {
-      console.log("[v0] Cache key changed, clearing image cache:", cacheKey)
-      // Revoke old blob URLs
-      blobUrlsRef.current.forEach((blobUrl) => {
-        URL.revokeObjectURL(blobUrl)
-      })
-      blobUrlsRef.current.clear()
-      setImageCache(new Map())
-      GoogleDriveClient.clearCache()
-    }
-  }, [cacheKey])
 
   const isGoogleDriveUrl = (url: string): boolean => {
     return url.includes("drive.google.com")
@@ -86,16 +73,8 @@ export function useImageCache(cacheKey?: number) {
     [imageCache],
   )
 
-  useEffect(() => {
-    return () => {
-      // Cleanup all blob URLs when component unmounts
-      blobUrlsRef.current.forEach((blobUrl) => {
-        URL.revokeObjectURL(blobUrl)
-      })
-      blobUrlsRef.current.clear()
-      GoogleDriveClient.clearCache()
-    }
-  }, [])
+  // GoogleDriveClient manages the cache lifecycle, allowing reuse when modal reopens
+  // Blob URLs will persist across modal open/close cycles
 
   return {
     imageCache,

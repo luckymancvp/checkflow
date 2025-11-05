@@ -23,9 +23,7 @@ export interface OrderReviewModalProps {
     isActive: boolean
     currentIndex: number
     orders: Order[]
-    startTimestamp: number // Added startTimestamp to track when review session started
   } | null
-  cacheKey?: number // Added cacheKey prop to force cache refresh on modal reopen
 }
 
 export type ViewMode = "tabs" | "stack"
