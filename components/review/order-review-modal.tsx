@@ -81,6 +81,7 @@ export function OrderReviewModal({
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
   const prefetchInProgressRef = useRef(false)
+  const lastPrefetchedIndexRef = useRef<number>(-1)
 
   const { preloadOrderImages, getCachedImageUrl } = useImageCache()
 
@@ -214,20 +215,28 @@ export function OrderReviewModal({
 
   useEffect(() => {
     if (!isOpen || !reviewMode || !order) return
+
+    const currentIdx = reviewMode.currentIndex
+
+    if (lastPrefetchedIndexRef.current === currentIdx) {
+      console.log("[v0] Already prefetched for index", currentIdx, "- skipping")
+      return
+    }
+
     if (prefetchInProgressRef.current) {
       console.log("[v0] Prefetch already in progress, skipping")
       return
     }
 
-    const currentIndex = reviewMode.currentIndex
-
     const prefetchNextOrders = async () => {
       prefetchInProgressRef.current = true
+      lastPrefetchedIndexRef.current = currentIdx
+
       const maxPrefetch = 5
       const totalOrders = reviewMode.orders.length
 
       for (let i = 1; i <= maxPrefetch; i++) {
-        const nextIndex = currentIndex + i
+        const nextIndex = currentIdx + i
 
         if (nextIndex >= totalOrders) {
           console.log(`[v0] Prefetch complete: reached end of orders at index ${nextIndex - 1}`)
