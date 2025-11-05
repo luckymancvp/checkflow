@@ -471,11 +471,11 @@ export default function CheckerPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Reviewer</TableHead>
-                      <TableHead className="text-right">Total Reviews</TableHead>
-                      <TableHead className="text-right">Confirmed</TableHead>
-                      <TableHead className="text-right">Need Repair</TableHead>
-                      <TableHead className="text-right">Design Errors</TableHead>
-                      <TableHead className="text-right">Customer Changes</TableHead>
+                      <TableHead className="text-right bg-slate-50">Total Reviews</TableHead>
+                      <TableHead className="text-right bg-green-50">Confirmed</TableHead>
+                      <TableHead className="text-right bg-red-50">Need Repair</TableHead>
+                      <TableHead className="text-right bg-orange-50">Design Errors</TableHead>
+                      <TableHead className="text-right bg-blue-50">Customer Changes</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -496,11 +496,19 @@ export default function CheckerPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">{reviewer.total}</TableCell>
-                        <TableCell className="text-right">{reviewer.byStatus.CONFIRMED || 0}</TableCell>
-                        <TableCell className="text-right">{reviewer.byStatus.NEED_REPAIR || 0}</TableCell>
-                        <TableCell className="text-right">{reviewer.byChangeType.design_error}</TableCell>
-                        <TableCell className="text-right">{reviewer.byChangeType.customer_change}</TableCell>
+                        <TableCell className="text-right font-semibold bg-slate-50">{reviewer.total}</TableCell>
+                        <TableCell className="text-right font-semibold text-green-700 bg-green-50">
+                          {reviewer.byStatus.CONFIRMED || 0}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-red-700 bg-red-50">
+                          {reviewer.byStatus.NEED_REPAIR || 0}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-orange-700 bg-orange-50">
+                          {reviewer.byChangeType.design_error}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-blue-700 bg-blue-50">
+                          {reviewer.byChangeType.customer_change}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button variant="outline" size="sm" onClick={() => handleReviewerClick(reviewer.id)}>
                             <Eye className="h-4 w-4 mr-2" />
