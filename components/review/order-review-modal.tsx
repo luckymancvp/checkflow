@@ -80,6 +80,7 @@ export function OrderReviewModal({
   const [jumpError, setJumpError] = useState("")
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const prefetchInProgressRef = useRef(false)
 
   const { preloadOrderImages, getCachedImageUrl } = useImageCache()
 
@@ -213,10 +214,15 @@ export function OrderReviewModal({
 
   useEffect(() => {
     if (!isOpen || !reviewMode || !order) return
+    if (prefetchInProgressRef.current) {
+      console.log("[v0] Prefetch already in progress, skipping")
+      return
+    }
 
     const currentIndex = reviewMode.currentIndex
 
     const prefetchNextOrders = async () => {
+      prefetchInProgressRef.current = true
       const maxPrefetch = 10
       const totalOrders = reviewMode.orders.length
 
@@ -241,6 +247,7 @@ export function OrderReviewModal({
       }
 
       console.log(`[v0] Prefetch batch complete`)
+      prefetchInProgressRef.current = false
     }
 
     prefetchNextOrders()
