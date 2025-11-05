@@ -22,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, ChevronDown, Zap, FileText, Eye, AlertTriangle, ScrollText } from "lucide-react" // Added AlertTriangle and ScrollText icons
+import { LogOut, ChevronDown, Zap, FileText, Eye, AlertTriangle, ScrollText, CheckCircle } from "lucide-react" // Added CheckCircle icon
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, usePathname } from "next/navigation"
@@ -30,19 +30,24 @@ import { Settings, HelpCircle } from "lucide-react"
 
 const navigationItems = [
   {
-    title: "Sheets", // New item
-    url: "/sheets", // New URL
-    icon: FileText, // New icon
+    title: "Sheets",
+    url: "/sheets",
+    icon: FileText,
   },
   {
-    title: "Review", // New item
-    url: "/review", // New URL
-    icon: Eye, // New icon
+    title: "Review",
+    url: "/review",
+    icon: Eye,
   },
   {
     title: "Need Repair",
     url: "/need-repair",
     icon: AlertTriangle,
+  },
+  {
+    title: "Checker",
+    url: "/checker",
+    icon: CheckCircle,
   },
   {
     title: "Changelog",
