@@ -215,12 +215,35 @@ export function OrderReviewModal({
     if (!isOpen || !reviewMode || !order) return
 
     const currentIndex = reviewMode.currentIndex
-    const nextIndex = currentIndex + 1
 
-    if (nextIndex < reviewMode.orders.length) {
-      const nextOrder = reviewMode.orders[nextIndex]
-      preloadOrderImages(nextOrder)
+    const prefetchNextOrders = async () => {
+      const maxPrefetch = 10
+      const totalOrders = reviewMode.orders.length
+
+      for (let i = 1; i <= maxPrefetch; i++) {
+        const nextIndex = currentIndex + i
+
+        if (nextIndex >= totalOrders) {
+          console.log(`[v0] Prefetch complete: reached end of orders at index ${nextIndex - 1}`)
+          break
+        }
+
+        const nextOrder = reviewMode.orders[nextIndex]
+        console.log(`[v0] Prefetching order ${i}/${maxPrefetch}: ${nextOrder.itemId} (index ${nextIndex})`)
+
+        try {
+          await preloadOrderImages(nextOrder)
+          console.log(`[v0] Successfully prefetched order ${nextOrder.itemId}`)
+        } catch (error) {
+          console.error(`[v0] Failed to prefetch order ${nextOrder.itemId}:`, error)
+          // Continue to next order even if one fails
+        }
+      }
+
+      console.log(`[v0] Prefetch batch complete`)
     }
+
+    prefetchNextOrders()
   }, [isOpen, reviewMode, order, preloadOrderImages])
 
   const formatDate = (dateString: string) => {
