@@ -19,6 +19,7 @@ export function useImageCache(cacheKey?: number) {
       })
       blobUrlsRef.current.clear()
       setImageCache(new Map())
+      GoogleDriveClient.clearCache()
     }
   }, [cacheKey])
 
@@ -92,6 +93,7 @@ export function useImageCache(cacheKey?: number) {
         URL.revokeObjectURL(blobUrl)
       })
       blobUrlsRef.current.clear()
+      GoogleDriveClient.clearCache()
     }
   }, [])
 
