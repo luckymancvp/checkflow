@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useApi } from "@/hooks/use-api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -87,6 +87,7 @@ export default function CheckerPage() {
     from: undefined,
     to: undefined,
   })
+  const [hasFallbackAttempted, setHasFallbackAttempted] = useState(false)
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams()
@@ -106,8 +107,27 @@ export default function CheckerPage() {
 
   const { data: statsData, loading, error, refetch } = useApi<CheckerStatsResponse>(`/checker/stats?${queryParams}`)
 
+  useEffect(() => {
+    if (!loading && statsData && !hasFallbackAttempted) {
+      const totalReviews = statsData.data?.summary?.totalReviews || 0
+
+      if (totalReviews === 0) {
+        if (timeRange === "today") {
+          console.log("[v0] No data for today, falling back to yesterday")
+          setTimeRange("yesterday")
+          setHasFallbackAttempted(true)
+        } else if (timeRange === "yesterday") {
+          console.log("[v0] No data for yesterday, falling back to last_week")
+          setTimeRange("last_week")
+          setHasFallbackAttempted(true)
+        }
+      }
+    }
+  }, [loading, statsData, timeRange, hasFallbackAttempted])
+
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value)
+    setHasFallbackAttempted(false)
     if (value !== "custom") {
       setCustomDateRange({ from: undefined, to: undefined })
     }
