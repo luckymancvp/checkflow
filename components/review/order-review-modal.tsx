@@ -223,7 +223,7 @@ export function OrderReviewModal({
 
     const prefetchNextOrders = async () => {
       prefetchInProgressRef.current = true
-      const maxPrefetch = 10
+      const maxPrefetch = 5
       const totalOrders = reviewMode.orders.length
 
       for (let i = 1; i <= maxPrefetch; i++) {
