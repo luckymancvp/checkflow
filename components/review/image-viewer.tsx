@@ -263,6 +263,7 @@ export function ImageViewer({
                   }}
                 >
                   <LazyImage
+                    key={`${order.itemId}-${activeImage.key}`}
                     src={activeImage.src}
                     alt={activeImage.label}
                     className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
@@ -350,6 +351,7 @@ export function ImageViewer({
               {img.src ? (
                 <div className="relative w-full h-full flex items-center justify-center p-4">
                   <LazyImage
+                    key={`${order.itemId}-${img.label}`}
                     src={img.src}
                     alt={img.label}
                     className="max-w-full max-h-full object-contain rounded-lg shadow-sm"

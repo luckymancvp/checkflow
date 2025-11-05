@@ -43,6 +43,7 @@ export default function ReviewPage() {
     isActive: boolean
     currentIndex: number
     orders: Order[]
+    startTimestamp: number
   } | null>(null)
 
   const [isLoadingNewSheet, setIsLoadingNewSheet] = useState(false)
@@ -147,6 +148,7 @@ export default function ReviewPage() {
       isActive: true,
       currentIndex: 0,
       orders: orders,
+      startTimestamp: Date.now(),
     })
   }
 
@@ -167,6 +169,14 @@ export default function ReviewPage() {
     setReviewMode({
       ...reviewMode,
       currentIndex: reviewMode.currentIndex - 1,
+    })
+  }
+
+  const handleJumpToIndex = (index: number) => {
+    if (!reviewMode || index < 0 || index >= reviewMode.orders.length) return
+    setReviewMode({
+      ...reviewMode,
+      currentIndex: index,
     })
   }
 
@@ -325,6 +335,7 @@ export default function ReviewPage() {
             onClose={handleReviewClose}
             onNext={handleReviewNext}
             onPrevious={handleReviewPrevious}
+            onJumpToIndex={handleJumpToIndex}
             onAction={handleReviewAction}
             availableStatuses={filterOptions.statuses}
             onStatusUpdate={handleStatusUpdate}
@@ -333,6 +344,7 @@ export default function ReviewPage() {
             syncError={syncError}
             onManualSync={triggerManualSync}
             reviewMode={reviewMode}
+            cacheKey={reviewMode.startTimestamp}
           />
         )}
       </div>

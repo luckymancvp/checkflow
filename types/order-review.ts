@@ -16,13 +16,16 @@ export interface OrderReviewModalProps {
   selectedSheet?: Sheet
   onNext: () => void
   onPrevious: () => void
+  onJumpToIndex: (index: number) => void // Added onJumpToIndex prop for direct navigation to specific order
   availableStatuses: string[]
   onStatusUpdate: (newStatus: Order["status"], note?: string, changeType?: "design_error" | "customer_change") => void
   reviewMode?: {
     isActive: boolean
     currentIndex: number
     orders: Order[]
+    startTimestamp: number // Added startTimestamp to track when review session started
   } | null
+  cacheKey?: number // Added cacheKey prop to force cache refresh on modal reopen
 }
 
 export type ViewMode = "tabs" | "stack"
