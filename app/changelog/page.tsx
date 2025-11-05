@@ -14,6 +14,23 @@ interface ChangelogEntry {
 
 const changelogEntries: ChangelogEntry[] = [
   {
+    version: "1.5.0",
+    date: "2025-11-05",
+    type: "feature",
+    changes: [
+      "Tích hợp Sentry để theo dõi lỗi và giám sát hiệu suất ứng dụng",
+      "Thêm trang quản lý người dùng với khả năng tạo, xem và lọc user theo vai trò",
+      "Thêm trang thống kê Need Repair với phân tích chi tiết theo designer và sản phẩm",
+      "Thêm dashboard Checker để theo dõi hiệu suất reviewer và lịch sử review",
+      "Thêm bảng auth_logs để ghi lại các sự kiện đăng nhập/đăng xuất",
+      "Cải thiện hệ thống Google Sheets với quản lý token và cấu hình sheet",
+      "Thêm tính năng lọc theo khoảng thời gian tùy chỉnh cho các trang thống kê",
+      "Thêm nút copy item ID nhanh chóng trong danh sách repair",
+      "Thêm thống kê chi tiết về design error và customer change",
+      "Cải thiện UI/UX với avatar, badge và card layout đẹp mắt hơn",
+    ],
+  },
+  {
     version: "1.4.0",
     date: "2025-09-05",
     type: "improvement",
