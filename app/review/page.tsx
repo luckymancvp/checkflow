@@ -62,15 +62,12 @@ export default function ReviewPage() {
     const productTypeCounts: Record<string, number> = {}
     const storeCounts: Record<string, number> = {}
 
-    // Get filtered orders (all filtered results, not just current page)
-    const filteredOrders = allOrders.filter((order) => {
-      // Apply same filtering logic as in useOrderData
+    // For designer counts: apply all filters EXCEPT designer filter
+    const ordersForDesignerCount = allOrders.filter((order) => {
       if (filters.status && filters.status.length > 0 && !filters.status.includes(order.status)) {
         return false
       }
-      if (filters.designer && filters.designer.length > 0 && !filters.designer.includes(order.designer)) {
-        return false
-      }
+      // Skip designer filter when calculating designer counts
       if (filters.productType && filters.productType.length > 0 && !filters.productType.includes(order.productType)) {
         return false
       }
@@ -98,14 +95,88 @@ export default function ReviewPage() {
       return true
     })
 
-    // Count filtered results
-    filteredOrders.forEach((order) => {
+    // For productType counts: apply all filters EXCEPT productType filter
+    const ordersForProductTypeCount = allOrders.filter((order) => {
+      if (filters.status && filters.status.length > 0 && !filters.status.includes(order.status)) {
+        return false
+      }
+      if (filters.designer && filters.designer.length > 0 && !filters.designer.includes(order.designer)) {
+        return false
+      }
+      // Skip productType filter when calculating productType counts
+      if (filters.store && filters.store.length > 0 && !filters.store.includes(order.store)) {
+        return false
+      }
+      if (filters.searchQuery) {
+        const query = filters.searchQuery.toLowerCase()
+        const searchableText = [
+          order.itemId,
+          order.orderNote,
+          order.personalization,
+          order.productName,
+          order.designer,
+          order.store,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+
+        if (!searchableText.includes(query)) {
+          return false
+        }
+      }
+      return true
+    })
+
+    // For store counts: apply all filters EXCEPT store filter
+    const ordersForStoreCount = allOrders.filter((order) => {
+      if (filters.status && filters.status.length > 0 && !filters.status.includes(order.status)) {
+        return false
+      }
+      if (filters.designer && filters.designer.length > 0 && !filters.designer.includes(order.designer)) {
+        return false
+      }
+      if (filters.productType && filters.productType.length > 0 && !filters.productType.includes(order.productType)) {
+        return false
+      }
+      // Skip store filter when calculating store counts
+      if (filters.searchQuery) {
+        const query = filters.searchQuery.toLowerCase()
+        const searchableText = [
+          order.itemId,
+          order.orderNote,
+          order.personalization,
+          order.productName,
+          order.designer,
+          order.store,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+
+        if (!searchableText.includes(query)) {
+          return false
+        }
+      }
+      return true
+    })
+
+    // Count designers from filtered orders (excluding designer filter)
+    ordersForDesignerCount.forEach((order) => {
       if (order.designer) {
         designerCounts[order.designer] = (designerCounts[order.designer] || 0) + 1
       }
+    })
+
+    // Count product types from filtered orders (excluding productType filter)
+    ordersForProductTypeCount.forEach((order) => {
       if (order.productType) {
         productTypeCounts[order.productType] = (productTypeCounts[order.productType] || 0) + 1
       }
+    })
+
+    // Count stores from filtered orders (excluding store filter)
+    ordersForStoreCount.forEach((order) => {
       if (order.store) {
         storeCounts[order.store] = (storeCounts[order.store] || 0) + 1
       }
