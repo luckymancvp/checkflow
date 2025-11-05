@@ -23,6 +23,7 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
+  ExternalLink,
 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
@@ -630,6 +631,19 @@ export function OrderReviewModal({
           </div>
 
           <div className="flex items-center gap-2">
+            {order.rowPosition && selectedSheet?.google_sheet_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const url = `https://docs.google.com/spreadsheets/d/${selectedSheet.google_sheet_id}/edit#gid=0&range=A${order.rowPosition}`
+                  window.open(url, "_blank")
+                }}
+                title="Open row in Google Sheets"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen (F)">
               <Maximize className="h-4 w-4" />
             </Button>
