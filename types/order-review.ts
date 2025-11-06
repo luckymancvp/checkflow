@@ -16,6 +16,7 @@ export interface OrderReviewModalProps {
   selectedSheet?: Sheet
   onNext: () => void
   onPrevious: () => void
+  onJumpToIndex: (index: number) => void // Added onJumpToIndex prop for direct navigation to specific order
   availableStatuses: string[]
   onStatusUpdate: (newStatus: Order["status"], note?: string, changeType?: "design_error" | "customer_change") => void
   reviewMode?: {

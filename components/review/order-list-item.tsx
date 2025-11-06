@@ -116,10 +116,7 @@ export function OrderListItem({ order }: OrderListItemProps) {
 
   const getMockupImageUrl = () => {
     if (order.mockup) {
-      // If mockup field has value, check if it's a Google Drive link
-      if (order.mockup.includes("drive.google.com")) {
-        return `https://go.pamoteam.top/ggdrive?url=${encodeURIComponent(order.mockup)}`
-      }
+      // Return original URL - cache system will handle Google Drive links
       return order.mockup
     }
     // If no mockup field value, use the find service
@@ -267,11 +264,7 @@ export function OrderListItem({ order }: OrderListItemProps) {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const mockupUrl = order.mockup
-                    ? order.mockup.includes("drive.google.com")
-                      ? `https://go.pamoteam.top/ggdrive?url=${encodeURIComponent(order.mockup)}`
-                      : order.mockup
-                    : `https://go.pamoteam.top/mockup/find?itemId=${order.itemId}`
+                  const mockupUrl = order.mockup || `https://go.pamoteam.top/mockup/find?itemId=${order.itemId}`
                   window.open(mockupUrl, "_blank")
                 }}
                 className="h-7 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"

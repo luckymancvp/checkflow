@@ -263,6 +263,7 @@ export function ImageViewer({
                   }}
                 >
                   <LazyImage
+                    key={`${order.itemId}-${activeImage.key}`}
                     src={activeImage.src}
                     alt={activeImage.label}
                     className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
@@ -277,6 +278,28 @@ export function ImageViewer({
                 </div>
 
                 <div className="absolute top-4 right-4 flex gap-2 z-10">
+                  {activeTab === "mockup" && order.mockup && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(order.mockup, "_blank")}
+                      className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
+                      title="Open mockup in new tab"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {activeTab === "design" && order.designLink && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(order.designLink, "_blank")}
+                      className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
+                      title="Open design in new tab"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -350,6 +373,7 @@ export function ImageViewer({
               {img.src ? (
                 <div className="relative w-full h-full flex items-center justify-center p-4">
                   <LazyImage
+                    key={`${order.itemId}-${img.label}`}
                     src={img.src}
                     alt={img.label}
                     className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
