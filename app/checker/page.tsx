@@ -88,6 +88,10 @@ export default function CheckerPage() {
     to: undefined,
   })
   const [hasFallbackAttempted, setHasFallbackAttempted] = useState(false)
+  const [clientTime, setClientTime] = useState<string>("")
+  const [clientTimezone, setClientTimezone] = useState<string>("")
+  const [serverTime, setServerTime] = useState<string>("")
+  const [serverTimezone, setServerTimezone] = useState<string>("")
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams()
@@ -106,6 +110,30 @@ export default function CheckerPage() {
   }, [timeRange, customDateRange, selectedReviewer])
 
   const { data: statsData, loading, error, refetch } = useApi<CheckerStatsResponse>(`/checker/stats?${queryParams}`)
+  const { data: serverTimeData } = useApi<{ success: boolean; data: { serverTime: string; serverTimezone: string } }>(
+    "/server-time",
+  )
+
+  useEffect(() => {
+    const updateClientTime = () => {
+      const now = new Date()
+      setClientTime(now.toLocaleTimeString("en-US", { hour12: false }))
+      setClientTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)
+    }
+
+    updateClientTime()
+    const interval = setInterval(updateClientTime, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    if (serverTimeData?.success) {
+      const serverDate = new Date(serverTimeData.data.serverTime)
+      setServerTime(serverDate.toLocaleTimeString("en-US", { hour12: false }))
+      setServerTimezone(serverTimeData.data.serverTimezone)
+    }
+  }, [serverTimeData])
 
   useEffect(() => {
     if (!loading && statsData && !hasFallbackAttempted) {
@@ -113,11 +141,9 @@ export default function CheckerPage() {
 
       if (totalReviews === 0) {
         if (timeRange === "today") {
-          console.log("[v0] No data for today, falling back to yesterday")
           setTimeRange("yesterday")
           setHasFallbackAttempted(true)
         } else if (timeRange === "yesterday") {
-          console.log("[v0] No data for yesterday, falling back to last_week")
           setTimeRange("last_week")
           setHasFallbackAttempted(true)
         }
@@ -326,6 +352,17 @@ export default function CheckerPage() {
               <CalendarIcon className="h-5 w-5 text-pink-600" />
               Time Range
             </CardTitle>
+            <CardDescription className="space-y-1">
+              <div className="flex items-center gap-4 text-xs">
+                <span className="font-medium">Timezone: {clientTimezone || "Loading..."}</span>
+                <span className="text-gray-400">|</span>
+                <span>Client: {clientTime || "Loading..."}</span>
+                <span className="text-gray-400">|</span>
+                <span>
+                  Server: {serverTime || "Loading..."} ({serverTimezone || "Loading..."})
+                </span>
+              </div>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
