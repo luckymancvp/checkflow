@@ -1,4 +1,4 @@
-"use client" // Make this a client component
+"use client"
 
 import type React from "react"
 import { Inter } from "next/font/google"
@@ -21,14 +21,12 @@ export default function ClientLayout({
   const isPublicRoute = publicRoutes.includes(pathname)
 
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="h-full">
+      <body className={`${inter.className} h-full overflow-hidden`}>
         <AuthProvider>
           {isPublicRoute ? (
-            // For public routes, render children directly without AuthGuard or MainLayoutWrapper
             children
           ) : (
-            // For protected routes, wrap children with AuthGuard and MainLayoutWrapper
             <AuthGuard>
               <MainLayoutWrapper>{children}</MainLayoutWrapper>
             </AuthGuard>
