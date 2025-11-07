@@ -23,6 +23,7 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
+  AlertCircle,
 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
@@ -79,6 +80,7 @@ export function OrderReviewModal({
   const [showOrderNoteImages, setShowOrderNoteImages] = useState(false)
   const [jumpItemId, setJumpItemId] = useState("")
   const [jumpError, setJumpError] = useState("")
+  const [showChangesNotification, setShowChangesNotification] = useState(false)
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
   const prefetchInProgressRef = useRef(false)
@@ -211,48 +213,14 @@ export function OrderReviewModal({
     setPanY(0)
     setRotation(0)
     setCurrentStatus(order.status) // Reset currentStatus to match the new order's actual status
-  }, [order.itemId, order.orderNote])
 
-  useEffect(() => {
-    if (!isOpen || !reviewMode || !order) return
-    if (prefetchInProgressRef.current) {
-      console.log("[v0] Prefetch already in progress, skipping")
-      return
+    if (order._changes) {
+      setShowChangesNotification(true)
+      setTimeout(() => setShowChangesNotification(false), 5000)
+    } else {
+      setShowChangesNotification(false)
     }
-
-    const currentIndex = reviewMode.currentIndex
-
-    const prefetchNextOrders = async () => {
-      prefetchInProgressRef.current = true
-      const maxPrefetch = 5
-      const totalOrders = reviewMode.orders.length
-
-      for (let i = 1; i <= maxPrefetch; i++) {
-        const nextIndex = currentIndex + i
-
-        if (nextIndex >= totalOrders) {
-          console.log(`[v0] Prefetch complete: reached end of orders at index ${nextIndex - 1}`)
-          break
-        }
-
-        const nextOrder = reviewMode.orders[nextIndex]
-        console.log(`[v0] Prefetching order ${i}/${maxPrefetch}: ${nextOrder.itemId} (index ${nextIndex})`)
-
-        try {
-          await preloadOrderImages(nextOrder)
-          console.log(`[v0] Successfully prefetched order ${nextOrder.itemId}`)
-        } catch (error) {
-          console.error(`[v0] Failed to prefetch order ${nextOrder.itemId}:`, error)
-          // Continue to next order even if one fails
-        }
-      }
-
-      console.log(`[v0] Prefetch batch complete`)
-      prefetchInProgressRef.current = false
-    }
-
-    prefetchNextOrders()
-  }, [isOpen, reviewMode, order, preloadOrderImages])
+  }, [order.itemId, order.orderNote, order._changes])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -645,6 +613,23 @@ export function OrderReviewModal({
     }
   }
 
+  const getFieldLabel = (field: string): string => {
+    const labels: Record<string, string> = {
+      status: "Status",
+      orderNote: "Order Note",
+      designer: "Designer",
+      designLink: "Design Link",
+      mockup: "Mockup",
+      customerImage: "Customer Image",
+      personalization: "Personalization",
+      productType: "Product Type",
+      productName: "Product Name",
+      store: "Store",
+      productImage: "Product Image",
+    }
+    return labels[field] || field
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
@@ -737,6 +722,35 @@ export function OrderReviewModal({
             </Button>
           </div>
         </div>
+
+        {showChangesNotification && order._changes && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-900 mb-1">Data Updated from Sheet</p>
+                <div className="space-y-1">
+                  {Object.entries(order._changes).map(([field, change]) => (
+                    <div key={field} className="text-xs text-amber-800">
+                      <span className="font-medium">{getFieldLabel(field)}:</span>{" "}
+                      <span className="line-through text-amber-600">{change.old || "(empty)"}</span>
+                      {" → "}
+                      <span className="font-semibold text-amber-900">{change.new || "(empty)"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChangesNotification(false)}
+                className="h-5 w-5 p-0 hover:bg-amber-100"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="flex h-[calc(100vh-60px)] overflow-hidden">
           {/* Left Panel - Controls */}

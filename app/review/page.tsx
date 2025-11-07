@@ -247,33 +247,36 @@ export default function ReviewPage() {
     if (!reviewMode || index < 0 || index >= reviewMode.orders.length) return
 
     const targetOrder = reviewMode.orders[index]
-    console.log(`[v0] Jumping to order ${targetOrder.itemId}, reloading data from sheet`)
 
-    setIsJumpLoading(true) // Set loading state before reloading
+    setReviewMode({
+      ...reviewMode,
+      currentIndex: index,
+    })
+
+    console.log(`[v0] Jumping to order ${targetOrder.itemId}, reloading data from sheet`)
+    setIsJumpLoading(true)
 
     try {
       const reloadedOrder = await reloadOrderFromSheet(targetOrder.itemId)
 
       if (reloadedOrder) {
+        const changes = detectOrderChanges(targetOrder, reloadedOrder)
+
         setReviewMode((prev) => {
           if (!prev) return prev
 
-          const updatedOrders = prev.orders.map((o) => (o.itemId === targetOrder.itemId ? reloadedOrder : o))
+          const updatedOrders = prev.orders.map((o) =>
+            o.itemId === targetOrder.itemId ? { ...reloadedOrder, _changes: changes } : o,
+          )
 
           return {
             ...prev,
             orders: updatedOrders,
-            currentIndex: index,
           }
-        })
-      } else {
-        setReviewMode({
-          ...reviewMode,
-          currentIndex: index,
         })
       }
     } finally {
-      setIsJumpLoading(false) // Clear loading state after reload completes
+      setIsJumpLoading(false)
     }
   }
 
@@ -353,6 +356,43 @@ export default function ReviewPage() {
         }
       })
     }
+  }
+
+  const detectOrderChanges = (
+    oldOrder: Order,
+    newOrder: Order,
+  ): Record<string, { old: string; new: string }> | null => {
+    const changes: Record<string, { old: string; new: string }> = {}
+    const fieldsToCheck: Array<keyof Order> = [
+      "status",
+      "orderNote",
+      "designer",
+      "designLink",
+      "mockup",
+      "customerImage",
+      "personalization",
+      "productType",
+      "productName",
+      "store",
+      "productImage",
+    ]
+
+    let hasChanges = false
+
+    fieldsToCheck.forEach((field) => {
+      const oldValue = (oldOrder[field] || "").toString()
+      const newValue = (newOrder[field] || "").toString()
+
+      if (oldValue !== newValue) {
+        changes[field] = {
+          old: oldValue,
+          new: newValue,
+        }
+        hasChanges = true
+      }
+    })
+
+    return hasChanges ? changes : null
   }
 
   return (

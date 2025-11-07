@@ -14,6 +14,7 @@ export interface Order {
   productType?: string
   productName?: string
   rowPosition?: number // 1-based row number in the Google Sheet
+  _changes?: Record<string, { old: string; new: string }> | null
 }
 
 export interface OrderFilters {
