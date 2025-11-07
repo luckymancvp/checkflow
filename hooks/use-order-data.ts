@@ -287,19 +287,16 @@ export function useOrderData() {
 
         console.log(`[v0] Processing ${items.length} items for sheet ${sheet.name}`)
 
+        // Handle NEED_REPAIR API calls first (these can't be batched)
         for (const item of items) {
-          if (item.newStatus === "NEED_REPAIR") {
-            if (!item.changeType) {
-              throw new Error(`Change type required for NEED_REPAIR status for order ${item.order.itemId}`)
-            }
 
-            console.log(`[v0] Calling API for NEED_REPAIR order ${item.order.itemId}`)
+            console.log(`[v0] Calling API for update order ${item.order.itemId}`)
             await callOrderAPI("/orders", {
               method: "POST",
               body: {
                 itemId: item.order.itemId,
                 googleSheetId: sheet.google_sheet_id,
-                status: "NEED_REPAIR",
+                status: item.newStatus,
                 changeType: item.changeType,
                 orderNote: item.note || item.order.orderNote,
                 designer: item.order.designer,
@@ -314,28 +311,7 @@ export function useOrderData() {
                 productName: item.order.productName,
               },
             })
-          } else if (item.newStatus === "CONFIRMED") {
-            console.log(`[v0] Calling API for CONFIRMED order ${item.order.itemId}`)
-            await callOrderAPI("/orders", {
-              method: "POST",
-              body: {
-                itemId: item.order.itemId,
-                googleSheetId: sheet.google_sheet_id,
-                status: "CONFIRMED",
-                orderNote: item.note || item.order.orderNote,
-                designer: item.order.designer,
-                designLink: item.order.designLink,
-                mockup: item.order.mockup,
-                customerImage: item.order.customerImage,
-                personalization: item.order.personalization,
-                date: item.order.date,
-                store: item.order.store,
-                productImage: item.order.productImage,
-                productType: item.order.productType,
-                productName: item.order.productName,
-              },
-            })
-          }
+          
         }
 
         if (items.length === 1) {
