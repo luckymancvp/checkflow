@@ -36,13 +36,13 @@ export function MainLayoutWrapper({ children }: MainLayoutWrapperProps) {
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar />
-      <SidebarInset className="flex flex-col w-full min-w-0">
+      <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-white sticky top-0 z-10">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <h2 className="text-lg font-semibold text-gray-900">{pageTitle}</h2>
         </header>
-        <div className="flex-1 min-h-0 bg-gray-50 overflow-auto">{children}</div>
+        <div className="bg-gray-50">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   )

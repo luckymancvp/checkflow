@@ -21,8 +21,8 @@ export default function ClientLayout({
   const isPublicRoute = publicRoutes.includes(pathname)
 
   return (
-    <html lang="en" className="h-full">
-      <body className={`${inter.className} h-full overflow-hidden`}>
+    <html lang="en">
+      <body className={inter.className}>
         <AuthProvider>
           {isPublicRoute ? (
             children
