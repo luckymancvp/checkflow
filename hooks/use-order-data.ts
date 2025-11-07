@@ -595,7 +595,7 @@ export function useOrderData() {
         let actualEndRow: number
 
         if (readDirection === "top-to-bottom") {
-          const maxEndRow = dataRange.endRow || 10000 // Use a large number if no end row specified
+          const maxEndRow = dataRange.endRow || 100000
 
           const dataLoadStartRow = Math.max(headerRow + 1, maxEndRow - maxRowsPerLoad + 1)
           actualEndRow = maxEndRow
@@ -603,7 +603,7 @@ export function useOrderData() {
           range = `${sheet.tab_name}!${startCol}${headerRow}:${endCol}${actualEndRow}`
         } else {
           const dataStartRow = dataRange.startRow || headerRow + 1
-          actualEndRow = Math.min(dataStartRow + maxRowsPerLoad - 1, dataRange.endRow || 1000)
+          actualEndRow = Math.min(dataStartRow + maxRowsPerLoad - 1, dataRange.endRow || 100000)
 
           range = `${sheet.tab_name}!${startCol}${headerRow}:${endCol}${actualEndRow}`
         }
