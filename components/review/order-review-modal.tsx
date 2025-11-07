@@ -216,7 +216,6 @@ export function OrderReviewModal({
 
     if (order._changes) {
       setShowChangesNotification(true)
-      setTimeout(() => setShowChangesNotification(false), 5000)
     } else {
       setShowChangesNotification(false)
     }
@@ -740,14 +739,14 @@ export function OrderReviewModal({
                   ))}
                 </div>
               </div>
-              <Button
+              {/* <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowChangesNotification(false)}
                 className="h-5 w-5 p-0 hover:bg-amber-100"
               >
                 <X className="h-3 w-3" />
-              </Button>
+              </Button> */}
             </div>
           </div>
         )}
