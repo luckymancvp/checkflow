@@ -24,6 +24,7 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
@@ -216,7 +217,6 @@ export function OrderReviewModal({
 
     if (order._changes) {
       setShowChangesNotification(true)
-      setTimeout(() => setShowChangesNotification(false), 5000)
     } else {
       setShowChangesNotification(false)
     }
@@ -701,9 +701,7 @@ export function OrderReviewModal({
               >
                 Go
               </Button>
-              {isJumpLoading && (
-                <span className="text-xs text-blue-600 whitespace-nowrap animate-pulse">loading from sheet</span>
-              )}
+              {isJumpLoading && <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />}
             </div>
           </div>
 
