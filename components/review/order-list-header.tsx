@@ -364,7 +364,7 @@ export function OrderListHeader({
               {/* Status Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Status</label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {filterOptions.statuses
                     .filter((status) => (statusCounts[status] || 0) > 0)
                     .sort((a, b) => a.localeCompare(b))
@@ -426,7 +426,7 @@ export function OrderListHeader({
               {/* Designer Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Designer</label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {filterOptions.designers
                     .filter((designer) => (designerCounts[designer] || 0) > 0)
                     .sort((a, b) => a.localeCompare(b))
@@ -464,7 +464,7 @@ export function OrderListHeader({
               {/* Product Type Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Product Type</label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {filterOptions.productTypes
                     .filter((type) => (productTypeCounts[type] || 0) > 0)
                     .sort((a, b) => a.localeCompare(b))
@@ -499,7 +499,7 @@ export function OrderListHeader({
               {/* Store Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Store</label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {filterOptions.stores
                     .filter((store) => (storeCounts[store] || 0) > 0)
                     .sort((a, b) => a.localeCompare(b))
