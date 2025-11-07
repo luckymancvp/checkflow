@@ -37,6 +37,7 @@ export default function ReviewPage() {
     changePageSize,
     changePage,
     updateOrderStatus,
+    reloadOrderFromSheet, // Import the new reload function
   } = useOrderData()
 
   const [reviewMode, setReviewMode] = useState<{
@@ -241,12 +242,35 @@ export default function ReviewPage() {
     })
   }
 
-  const handleJumpToIndex = (index: number) => {
+  const handleJumpToIndex = async (index: number) => {
     if (!reviewMode || index < 0 || index >= reviewMode.orders.length) return
-    setReviewMode({
-      ...reviewMode,
-      currentIndex: index,
-    })
+
+    const targetOrder = reviewMode.orders[index]
+    console.log(`[v0] Jumping to order ${targetOrder.itemId}, reloading data from sheet`)
+
+    // Reload the order data from the sheet
+    const reloadedOrder = await reloadOrderFromSheet(targetOrder.itemId)
+
+    if (reloadedOrder) {
+      // Update the reviewMode orders with the reloaded data
+      setReviewMode((prev) => {
+        if (!prev) return prev
+
+        const updatedOrders = prev.orders.map((o) => (o.itemId === targetOrder.itemId ? reloadedOrder : o))
+
+        return {
+          ...prev,
+          orders: updatedOrders,
+          currentIndex: index,
+        }
+      })
+    } else {
+      // If reload failed, just update the index
+      setReviewMode({
+        ...reviewMode,
+        currentIndex: index,
+      })
+    }
   }
 
   const handleReviewAction = async (
