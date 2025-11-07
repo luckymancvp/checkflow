@@ -53,6 +53,7 @@ export function OrderReviewModal({
   availableStatuses,
   onStatusUpdate,
   reviewMode,
+  isJumpLoading,
 }: OrderReviewModalProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("tabs")
   const [activeTab, setActiveTab] = useState<ActiveTab>("mockup")
@@ -696,7 +697,8 @@ export function OrderReviewModal({
                   }}
                   onKeyDown={handleJumpKeyDown}
                   placeholder="Jump to Item ID..."
-                  className="h-7 px-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-72"
+                  disabled={isJumpLoading}
+                  className="h-7 px-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-72 disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 {jumpError && (
                   <div className="absolute top-full left-0 mt-1 text-xs text-red-600 whitespace-nowrap bg-white px-2 py-1 rounded shadow-sm border border-red-200">
@@ -708,11 +710,15 @@ export function OrderReviewModal({
                 variant="outline"
                 size="sm"
                 onClick={handleJumpToOrder}
-                className="h-7 px-2 text-xs bg-transparent"
+                disabled={isJumpLoading}
+                className="h-7 px-2 text-xs bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Jump to order by Item ID"
               >
                 Go
               </Button>
+              {isJumpLoading && (
+                <span className="text-xs text-blue-600 whitespace-nowrap animate-pulse">loading from sheet</span>
+              )}
             </div>
           </div>
 

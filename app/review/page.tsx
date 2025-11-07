@@ -47,6 +47,7 @@ export default function ReviewPage() {
   } | null>(null)
 
   const [isLoadingNewSheet, setIsLoadingNewSheet] = useState(false)
+  const [isJumpLoading, setIsJumpLoading] = useState(false) // Added loading state for jumping to orders
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -248,28 +249,31 @@ export default function ReviewPage() {
     const targetOrder = reviewMode.orders[index]
     console.log(`[v0] Jumping to order ${targetOrder.itemId}, reloading data from sheet`)
 
-    // Reload the order data from the sheet
-    const reloadedOrder = await reloadOrderFromSheet(targetOrder.itemId)
+    setIsJumpLoading(true) // Set loading state before reloading
 
-    if (reloadedOrder) {
-      // Update the reviewMode orders with the reloaded data
-      setReviewMode((prev) => {
-        if (!prev) return prev
+    try {
+      const reloadedOrder = await reloadOrderFromSheet(targetOrder.itemId)
 
-        const updatedOrders = prev.orders.map((o) => (o.itemId === targetOrder.itemId ? reloadedOrder : o))
+      if (reloadedOrder) {
+        setReviewMode((prev) => {
+          if (!prev) return prev
 
-        return {
-          ...prev,
-          orders: updatedOrders,
+          const updatedOrders = prev.orders.map((o) => (o.itemId === targetOrder.itemId ? reloadedOrder : o))
+
+          return {
+            ...prev,
+            orders: updatedOrders,
+            currentIndex: index,
+          }
+        })
+      } else {
+        setReviewMode({
+          ...reviewMode,
           currentIndex: index,
-        }
-      })
-    } else {
-      // If reload failed, just update the index
-      setReviewMode({
-        ...reviewMode,
-        currentIndex: index,
-      })
+        })
+      }
+    } finally {
+      setIsJumpLoading(false) // Clear loading state after reload completes
     }
   }
 
@@ -437,6 +441,7 @@ export default function ReviewPage() {
             syncError={syncError}
             onManualSync={triggerManualSync}
             reviewMode={reviewMode}
+            isJumpLoading={isJumpLoading} // Pass loading state to modal
           />
         )}
       </div>
