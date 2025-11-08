@@ -639,7 +639,9 @@ export function OrderReviewModal({
 
   const handleOpenSheet = () => {
     if (!selectedSheet?.google_sheet_id) return
-    const sheetUrl = `https://docs.google.com/spreadsheets/d/${selectedSheet.google_sheet_id}`
+    // Calculate the actual row number (currentIndex + 2 to account for header row and 0-based index)
+    const rowNumber = currentIndex + 2
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${selectedSheet.google_sheet_id}/edit#gid=0&range=A${rowNumber}`
     window.open(sheetUrl, "_blank")
   }
 
