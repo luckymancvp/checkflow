@@ -47,7 +47,7 @@ export default function ReviewPage() {
   } | null>(null)
 
   const [isLoadingNewSheet, setIsLoadingNewSheet] = useState(false)
-  const [isJumpLoading, setIsJumpLoading] = useState(false) // Added loading state for jumping to orders
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false)
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -246,38 +246,10 @@ export default function ReviewPage() {
   const handleJumpToIndex = async (index: number) => {
     if (!reviewMode || index < 0 || index >= reviewMode.orders.length) return
 
-    const targetOrder = reviewMode.orders[index]
-
     setReviewMode({
       ...reviewMode,
       currentIndex: index,
     })
-
-    console.log(`[v0] Jumping to order ${targetOrder.itemId}, reloading data from sheet`)
-    setIsJumpLoading(true)
-
-    try {
-      const reloadedOrder = await reloadOrderFromSheet(targetOrder.itemId)
-
-      if (reloadedOrder) {
-        const changes = detectOrderChanges(targetOrder, reloadedOrder)
-
-        setReviewMode((prev) => {
-          if (!prev) return prev
-
-          const updatedOrders = prev.orders.map((o) =>
-            o.itemId === targetOrder.itemId ? { ...reloadedOrder, _changes: changes } : o,
-          )
-
-          return {
-            ...prev,
-            orders: updatedOrders,
-          }
-        })
-      }
-    } finally {
-      setIsJumpLoading(false)
-    }
   }
 
   const handleReviewAction = async (
@@ -395,33 +367,43 @@ export default function ReviewPage() {
     return hasChanges ? changes : null
   }
 
-  const handleSyncFromSheet = async (itemId: string): Promise<Order | null> => {
-    const reloadedOrder = await reloadOrderFromSheet(itemId)
+  useEffect(() => {
+    if (!reviewMode || !reviewMode.isActive) return
 
-    if (reloadedOrder && reviewMode) {
-      const targetOrder = reviewMode.orders.find((o) => o.itemId === itemId)
-      if (targetOrder) {
-        const changes = detectOrderChanges(targetOrder, reloadedOrder)
+    const currentOrder = reviewMode.orders[reviewMode.currentIndex]
+    if (!currentOrder) return
 
-        setReviewMode((prev) => {
-          if (!prev) return prev
+    // Auto-sync from sheet when order changes
+    const syncOrder = async () => {
+      console.log(`[v0] Auto-syncing order ${currentOrder.itemId} from sheet`)
+      setIsAutoSyncing(true)
 
-          const updatedOrders = prev.orders.map((o) =>
-            o.itemId === itemId ? { ...reloadedOrder, _changes: changes } : o,
-          )
+      try {
+        const reloadedOrder = await reloadOrderFromSheet(currentOrder.itemId)
 
-          return {
-            ...prev,
-            orders: updatedOrders,
-          }
-        })
+        if (reloadedOrder) {
+          const changes = detectOrderChanges(currentOrder, reloadedOrder)
 
-        return { ...reloadedOrder, _changes: changes }
+          setReviewMode((prev) => {
+            if (!prev) return prev
+
+            const updatedOrders = prev.orders.map((o) =>
+              o.itemId === currentOrder.itemId ? { ...reloadedOrder, _changes: changes } : o,
+            )
+
+            return {
+              ...prev,
+              orders: updatedOrders,
+            }
+          })
+        }
+      } finally {
+        setIsAutoSyncing(false)
       }
     }
 
-    return reloadedOrder
-  }
+    syncOrder()
+  }, [reviewMode]) // Updated to use the entire reviewMode object
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -509,8 +491,7 @@ export default function ReviewPage() {
             syncError={syncError}
             onManualSync={triggerManualSync}
             reviewMode={reviewMode}
-            isJumpLoading={isJumpLoading}
-            onSyncFromSheet={handleSyncFromSheet} // Pass sync handler
+            isJumpLoading={isAutoSyncing}
           />
         )}
       </div>
