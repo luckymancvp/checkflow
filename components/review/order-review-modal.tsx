@@ -26,7 +26,7 @@ import {
   EyeOff,
   AlertCircle,
   RefreshCw,
-  ExternalLink,
+  FileSpreadsheet,
 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
@@ -756,7 +756,7 @@ export function OrderReviewModal({
                 onClick={() => window.open(getSheetCellUrl()!, "_blank")}
                 title="Open in Google Sheets"
               >
-                <ExternalLink className="h-4 w-4" />
+                <FileSpreadsheet className="h-4 w-4" />
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen (F)">
@@ -797,7 +797,7 @@ export function OrderReviewModal({
                     onClick={() => window.open(getSheetCellUrl()!, "_blank")}
                     className="mt-2 h-7 text-xs bg-white border-red-300 text-red-700 hover:bg-red-100 hover:text-red-800"
                   >
-                    <ExternalLink className="h-3 w-3 mr-1.5" />
+                    <FileSpreadsheet className="h-3 w-3 mr-1.5" />
                     Open Sheet
                   </Button>
                 )}
@@ -840,7 +840,7 @@ export function OrderReviewModal({
                     onClick={() => window.open(getSheetCellUrl()!, "_blank")}
                     className="mt-2 h-7 text-xs bg-white border-amber-300 text-amber-700 hover:bg-amber-100 hover:text-amber-800"
                   >
-                    <ExternalLink className="h-3 w-3 mr-1.5" />
+                    <FileSpreadsheet className="h-3 w-3 mr-1.5" />
                     Open Sheet
                   </Button>
                 )}
