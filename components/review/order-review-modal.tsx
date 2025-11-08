@@ -25,6 +25,7 @@ import {
   EyeOff,
   AlertCircle,
   RefreshCw,
+  ExternalLink,
 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
@@ -636,6 +637,12 @@ export function OrderReviewModal({
     return labels[field] || field
   }
 
+  const handleOpenSheet = () => {
+    if (!selectedSheet?.google_sheet_id) return
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${selectedSheet.google_sheet_id}`
+    window.open(sheetUrl, "_blank")
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
@@ -740,18 +747,32 @@ export function OrderReviewModal({
                   <span className="font-medium">Current Item ID:</span>{" "}
                   <span className="font-mono bg-red-100 px-1.5 py-0.5 rounded font-semibold">{order.itemId}</span>
                 </div>
-                <p className="text-xs text-red-700 mt-1 italic">
+                <p className="text-xs text-red-700 mt-2 italic">
                   The sheet data at this row has been updated with a different order.
                 </p>
+                <p className="text-xs text-red-800 mt-2 font-medium">Please check the sheet to verify the changes.</p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowItemIdChangeNotification(false)}
-                className="h-5 w-5 p-0 hover:bg-red-100"
-              >
-                <X className="h-3 w-3" />
-              </Button>
+              <div className="flex items-start gap-2">
+                {selectedSheet?.google_sheet_id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenSheet}
+                    className="h-7 px-2.5 text-xs bg-white hover:bg-red-100 border-red-300 text-red-700 hover:text-red-800"
+                  >
+                    <ExternalLink className="h-3 w-3 mr-1.5" />
+                    Open Sheet
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowItemIdChangeNotification(false)}
+                  className="h-5 w-5 p-0 hover:bg-red-100"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
