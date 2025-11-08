@@ -82,6 +82,7 @@ export function OrderReviewModal({
   const [jumpItemId, setJumpItemId] = useState("")
   const [jumpError, setJumpError] = useState("")
   const [showChangesNotification, setShowChangesNotification] = useState(false)
+  const [showItemIdChangeNotification, setShowItemIdChangeNotification] = useState(false)
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
   const prefetchInProgressRef = useRef(false)
@@ -213,14 +214,19 @@ export function OrderReviewModal({
     setPanX(0)
     setPanY(0)
     setRotation(0)
-    setCurrentStatus(order.status) // Reset currentStatus to match the new order's actual status
+    setCurrentStatus(order.status)
 
-    if (order._changes) {
+    if (order._itemIdChanged) {
+      setShowItemIdChangeNotification(true)
+      setShowChangesNotification(false)
+    } else if (order._changes) {
       setShowChangesNotification(true)
+      setShowItemIdChangeNotification(false)
     } else {
       setShowChangesNotification(false)
+      setShowItemIdChangeNotification(false)
     }
-  }, [order.itemId, order.orderNote, order._changes])
+  }, [order.itemId, order.orderNote, order._changes, order._itemIdChanged])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -720,6 +726,35 @@ export function OrderReviewModal({
             </Button>
           </div>
         </div>
+
+        {showItemIdChangeNotification && order._itemIdChanged && (
+          <div className="bg-red-50 border-b border-red-200 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-red-900 mb-1">Row Changed - Different Order Detected</p>
+                <div className="text-xs text-red-800">
+                  <span className="font-medium">Expected Item ID:</span>{" "}
+                  <span className="font-mono bg-red-100 px-1.5 py-0.5 rounded">{order._itemIdChanged}</span>
+                  {" → "}
+                  <span className="font-medium">Current Item ID:</span>{" "}
+                  <span className="font-mono bg-red-100 px-1.5 py-0.5 rounded font-semibold">{order.itemId}</span>
+                </div>
+                <p className="text-xs text-red-700 mt-1 italic">
+                  The sheet data at this row has been updated with a different order.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowItemIdChangeNotification(false)}
+                className="h-5 w-5 p-0 hover:bg-red-100"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {showChangesNotification && order._changes && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
