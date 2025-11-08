@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { LazyImage } from "@/components/ui/lazy-image"
 import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
+import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
   X,
   ChevronLeft,
@@ -83,6 +84,7 @@ export function OrderReviewModal({
   const [jumpError, setJumpError] = useState("")
   const [showChangesNotification, setShowChangesNotification] = useState(false)
   const [showItemIdChangeNotification, setShowItemIdChangeNotification] = useState(false)
+  const [sheetGid, setSheetGid] = useState<string | null>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
   const prefetchInProgressRef = useRef(false)
@@ -637,18 +639,38 @@ export function OrderReviewModal({
   }
 
   const getSheetCellUrl = () => {
-    if (!selectedSheet || !order.rowPosition) return null
+    if (!selectedSheet || !order.rowPosition || !sheetGid) return null
 
     // Generate URL that links to the specific row in Google Sheets
-    // Format: https://docs.google.com/spreadsheets/d/{google_sheet_id}/edit#gid=0&range=A{row}
+    // Format: https://docs.google.com/spreadsheets/d/{google_sheet_id}/edit#gid={sheetGid}&range=A{row}
     const baseUrl = `https://docs.google.com/spreadsheets/d/${selectedSheet.google_sheet_id}/edit`
-
-    // For now, use gid=0 (first sheet). In the future, this could be enhanced to get the actual sheet ID
-    const gid = "0"
     const range = `A${order.rowPosition}`
 
-    return `${baseUrl}#gid=${gid}&range=${range}`
+    return `${baseUrl}#gid=${sheetGid}&range=${range}`
   }
+
+  useEffect(() => {
+    const fetchSheetGid = async () => {
+      if (!selectedSheet?.google_sheet_id || !selectedSheet?.tab_name) {
+        setSheetGid(null)
+        return
+      }
+
+      try {
+        const result = await googleSheetsClient.getSheetTabs(selectedSheet.google_sheet_id)
+        if (result.success && result.data) {
+          const tab = result.data.find((t: any) => t.title === selectedSheet.tab_name)
+          if (tab) {
+            setSheetGid(tab.id.toString())
+          }
+        }
+      } catch (error) {
+        console.error("[OrderReviewModal] Failed to fetch sheet gid:", error)
+      }
+    }
+
+    fetchSheetGid()
+  }, [selectedSheet?.google_sheet_id, selectedSheet?.tab_name])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
