@@ -6,7 +6,7 @@ import { SheetSelector } from "@/components/review/sheet-selector"
 import { OrderListHeader } from "@/components/review/order-list-header"
 import { SyncStatusIndicator } from "@/components/sync-status-indicator"
 import type { Order } from "@/types/order"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import { RefreshCw } from "lucide-react"
@@ -48,6 +48,8 @@ export default function ReviewPage() {
 
   const [isLoadingNewSheet, setIsLoadingNewSheet] = useState(false)
   const [isAutoSyncing, setIsAutoSyncing] = useState(false)
+
+  const syncedOrdersRef = useRef<Set<string>>(new Set())
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -141,7 +143,6 @@ export default function ReviewPage() {
       if (filters.productType && filters.productType.length > 0 && !filters.productType.includes(order.productType)) {
         return false
       }
-      // Skip store filter when calculating store counts
       if (filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase()
         const searchableText = [
@@ -216,6 +217,8 @@ export default function ReviewPage() {
     if (orders.length === 0) return
 
     console.log("[ReviewPage] Starting sequential review with", orders.length, "orders")
+    syncedOrdersRef.current.clear()
+
     setReviewMode({
       isActive: true,
       currentIndex: 0,
@@ -373,7 +376,12 @@ export default function ReviewPage() {
     const currentOrder = reviewMode.orders[reviewMode.currentIndex]
     if (!currentOrder) return
 
-    // Auto-sync from sheet when order changes
+    // Check if this order has already been synced
+    if (syncedOrdersRef.current.has(currentOrder.itemId)) {
+      return
+    }
+
+    // Auto-sync from sheet when moving to a new order
     const syncOrder = async () => {
       console.log(`[v0] Auto-syncing order ${currentOrder.itemId} from sheet`)
       setIsAutoSyncing(true)
@@ -383,6 +391,9 @@ export default function ReviewPage() {
 
         if (reloadedOrder) {
           const changes = detectOrderChanges(currentOrder, reloadedOrder)
+
+          // Mark this order as synced
+          syncedOrdersRef.current.add(currentOrder.itemId)
 
           setReviewMode((prev) => {
             if (!prev) return prev
@@ -403,7 +414,7 @@ export default function ReviewPage() {
     }
 
     syncOrder()
-  }, [reviewMode]) // Updated to use the entire reviewMode object
+  }, [reviewMode]) // Updated dependency array to include reviewMode
 
   return (
     <div className="min-h-screen bg-gray-50">
