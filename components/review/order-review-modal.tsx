@@ -25,7 +25,6 @@ import {
   EyeOff,
   AlertCircle,
   RefreshCw,
-  ExternalLink,
 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
@@ -637,12 +636,18 @@ export function OrderReviewModal({
     return labels[field] || field
   }
 
-  const handleOpenSheet = () => {
-    if (!selectedSheet?.google_sheet_id) return
-    // Calculate the actual row number (currentIndex + 2 to account for header row and 0-based index)
-    const rowNumber = currentIndex + 2
-    const sheetUrl = `https://docs.google.com/spreadsheets/d/${selectedSheet.google_sheet_id}/edit#gid=0&range=A${rowNumber}`
-    window.open(sheetUrl, "_blank")
+  const getSheetCellUrl = () => {
+    if (!selectedSheet || !order.rowPosition) return null
+
+    // Generate URL that links to the specific row in Google Sheets
+    // Format: https://docs.google.com/spreadsheets/d/{google_sheet_id}/edit#gid=0&range=A{row}
+    const baseUrl = `https://docs.google.com/spreadsheets/d/${selectedSheet.google_sheet_id}/edit`
+
+    // For now, use gid=0 (first sheet). In the future, this could be enhanced to get the actual sheet ID
+    const gid = "0"
+    const range = `A${order.rowPosition}`
+
+    return `${baseUrl}#gid=${gid}&range=${range}`
   }
 
   return (
@@ -749,32 +754,29 @@ export function OrderReviewModal({
                   <span className="font-medium">Current Item ID:</span>{" "}
                   <span className="font-mono bg-red-100 px-1.5 py-0.5 rounded font-semibold">{order.itemId}</span>
                 </div>
-                <p className="text-xs text-red-700 mt-2 italic">
-                  The sheet data at this row has been updated with a different order.
+                <p className="text-xs text-red-700 mt-2">
+                  The sheet data at this row has been updated with a different order. Please check the sheet to verify.
                 </p>
-                <p className="text-xs text-red-800 mt-2 font-medium">Please check the sheet to verify the changes.</p>
-              </div>
-              <div className="flex items-start gap-2">
-                {selectedSheet?.google_sheet_id && (
+                {getSheetCellUrl() && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleOpenSheet}
-                    className="h-7 px-2.5 text-xs bg-white hover:bg-red-100 border-red-300 text-red-700 hover:text-red-800"
+                    onClick={() => window.open(getSheetCellUrl()!, "_blank")}
+                    className="mt-2 h-7 text-xs bg-white border-red-300 text-red-700 hover:bg-red-100 hover:text-red-800"
                   >
-                    <ExternalLink className="h-3 w-3 mr-1.5" />
+                    <RefreshCw className="h-3 w-3 mr-1.5" />
                     Open Sheet
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowItemIdChangeNotification(false)}
-                  className="h-5 w-5 p-0 hover:bg-red-100"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowItemIdChangeNotification(false)}
+                className="h-5 w-5 p-0 hover:bg-red-100"
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
           </div>
         )}
@@ -795,6 +797,20 @@ export function OrderReviewModal({
                     </div>
                   ))}
                 </div>
+                <p className="text-xs text-amber-700 mt-2">
+                  Changes detected from sheet. Click below to view in Google Sheets.
+                </p>
+                {getSheetCellUrl() && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(getSheetCellUrl()!, "_blank")}
+                    className="mt-2 h-7 text-xs bg-white border-amber-300 text-amber-700 hover:bg-amber-100 hover:text-amber-800"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1.5" />
+                    Open Sheet
+                  </Button>
+                )}
               </div>
               <Button
                 variant="ghost"
