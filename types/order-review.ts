@@ -25,6 +25,7 @@ export interface OrderReviewModalProps {
     orders: Order[]
   } | null
   isJumpLoading?: boolean // Added loading state for jump to order functionality
+  onSyncFromSheet?: (itemId: string) => Promise<Order | null> // Added onSyncFromSheet prop for syncing current order from sheet
 }
 
 export type ViewMode = "tabs" | "stack"

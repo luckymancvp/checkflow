@@ -56,6 +56,7 @@ export function OrderReviewModal({
   onStatusUpdate,
   reviewMode,
   isJumpLoading,
+  onSyncFromSheet, // Add onSyncFromSheet prop
 }: OrderReviewModalProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("tabs")
   const [activeTab, setActiveTab] = useState<ActiveTab>("mockup")
@@ -82,6 +83,7 @@ export function OrderReviewModal({
   const [jumpItemId, setJumpItemId] = useState("")
   const [jumpError, setJumpError] = useState("")
   const [showChangesNotification, setShowChangesNotification] = useState(false)
+  const [isSyncingFromSheet, setIsSyncingFromSheet] = useState(false)
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
   const prefetchInProgressRef = useRef(false)
@@ -613,6 +615,23 @@ export function OrderReviewModal({
     }
   }
 
+  const handleSyncFromSheet = async () => {
+    if (!order.itemId || !onSyncFromSheet) return
+
+    console.log(`[v0] Manually syncing order ${order.itemId} from sheet`)
+    setIsSyncingFromSheet(true)
+
+    try {
+      const reloadedOrder = await onSyncFromSheet(order.itemId)
+
+      if (reloadedOrder && reloadedOrder._changes) {
+        setShowChangesNotification(true)
+      }
+    } finally {
+      setIsSyncingFromSheet(false)
+    }
+  }
+
   const getFieldLabel = (field: string): string => {
     const labels: Record<string, string> = {
       status: "Status",
@@ -644,6 +663,16 @@ export function OrderReviewModal({
                 ) : (
                   <Copy className="h-3 w-3 text-gray-500" />
                 )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSyncFromSheet}
+                disabled={isSyncingFromSheet}
+                className="h-6 w-6 p-0 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Sync from sheet"
+              >
+                <RefreshCw className={`h-3 w-3 text-gray-500 ${isSyncingFromSheet ? "animate-spin" : ""}`} />
               </Button>
             </div>
             <div className="flex items-center gap-2">

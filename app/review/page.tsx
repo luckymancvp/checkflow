@@ -395,6 +395,34 @@ export default function ReviewPage() {
     return hasChanges ? changes : null
   }
 
+  const handleSyncFromSheet = async (itemId: string): Promise<Order | null> => {
+    const reloadedOrder = await reloadOrderFromSheet(itemId)
+
+    if (reloadedOrder && reviewMode) {
+      const targetOrder = reviewMode.orders.find((o) => o.itemId === itemId)
+      if (targetOrder) {
+        const changes = detectOrderChanges(targetOrder, reloadedOrder)
+
+        setReviewMode((prev) => {
+          if (!prev) return prev
+
+          const updatedOrders = prev.orders.map((o) =>
+            o.itemId === itemId ? { ...reloadedOrder, _changes: changes } : o,
+          )
+
+          return {
+            ...prev,
+            orders: updatedOrders,
+          }
+        })
+
+        return { ...reloadedOrder, _changes: changes }
+      }
+    }
+
+    return reloadedOrder
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto p-6 space-y-6">
@@ -481,7 +509,8 @@ export default function ReviewPage() {
             syncError={syncError}
             onManualSync={triggerManualSync}
             reviewMode={reviewMode}
-            isJumpLoading={isJumpLoading} // Pass loading state to modal
+            isJumpLoading={isJumpLoading}
+            onSyncFromSheet={handleSyncFromSheet} // Pass sync handler
           />
         )}
       </div>
