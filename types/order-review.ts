@@ -24,6 +24,7 @@ export interface OrderReviewModalProps {
     currentIndex: number
     orders: Order[]
   } | null
+  isJumpLoading?: boolean // Added loading state for jump to order functionality
 }
 
 export type ViewMode = "tabs" | "stack"

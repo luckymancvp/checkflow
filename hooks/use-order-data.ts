@@ -289,33 +289,27 @@ export function useOrderData() {
 
         // Handle NEED_REPAIR API calls first (these can't be batched)
         for (const item of items) {
-          if (item.newStatus === "NEED_REPAIR") {
-            if (!item.changeType) {
-              throw new Error(`Change type required for NEED_REPAIR status for order ${item.order.itemId}`)
-            }
-
-            console.log(`[v0] Calling API for NEED_REPAIR order ${item.order.itemId}`)
-            await callOrderAPI("/orders", {
-              method: "POST",
-              body: {
-                itemId: item.order.itemId,
-                googleSheetId: sheet.google_sheet_id,
-                status: "NEED_REPAIR",
-                changeType: item.changeType,
-                orderNote: item.note || item.order.orderNote,
-                designer: item.order.designer,
-                designLink: item.order.designLink,
-                mockup: item.order.mockup,
-                customerImage: item.order.customerImage,
-                personalization: item.order.personalization,
-                date: item.order.date,
-                store: item.order.store,
-                productImage: item.order.productImage,
-                productType: item.order.productType,
-                productName: item.order.productName,
-              },
-            })
-          }
+          console.log(`[v0] Calling API for update order ${item.order.itemId}`)
+          await callOrderAPI("/orders", {
+            method: "POST",
+            body: {
+              itemId: item.order.itemId,
+              googleSheetId: sheet.google_sheet_id,
+              status: item.newStatus,
+              changeType: item.changeType,
+              orderNote: item.note || item.order.orderNote,
+              designer: item.order.designer,
+              designLink: item.order.designLink,
+              mockup: item.order.mockup,
+              customerImage: item.order.customerImage,
+              personalization: item.order.personalization,
+              date: item.order.date,
+              store: item.order.store,
+              productImage: item.order.productImage,
+              productType: item.order.productType,
+              productName: item.order.productName,
+            },
+          })
         }
 
         if (items.length === 1) {
@@ -449,6 +443,131 @@ export function useOrderData() {
     [normalizeStatus],
   )
 
+  const reloadOrderFromSheet = useCallback(
+    async (itemId: string): Promise<Order | null> => {
+      if (!state.selectedSheet) {
+        console.error("[v0] No sheet selected for reload")
+        return null
+      }
+
+      const sheet = sheets.find((s) => s.id === state.selectedSheet)
+      if (!sheet) {
+        console.error("[v0] Selected sheet not found")
+        return null
+      }
+
+      try {
+        const { configuration } = sheet
+        const { columnMapping, dataRange } = configuration
+
+        const headerRow = dataRange.headerRow || 1
+        const columns = dataRange.columns || "A:Z"
+        const [startCol, endCol] = columns.split(":")
+
+        // Find the existing order to get its row position
+        const existingOrder = state.orders.find((o) => o.itemId === itemId)
+        if (!existingOrder || !existingOrder.rowPosition) {
+          console.error("[v0] Order not found or missing row position")
+          return null
+        }
+
+        // Fetch just the header row and the specific order row
+        const range = `${sheet.tab_name}!${startCol}${headerRow}:${endCol}${existingOrder.rowPosition}`
+
+        console.log(`[v0] Reloading order ${itemId} from row ${existingOrder.rowPosition}`)
+
+        const response = await googleSheetsClient.getSheetData(sheet.google_sheet_id, range)
+
+        if (!response.success) {
+          console.error("[v0] Failed to reload order data:", response.error)
+          return null
+        }
+
+        const rows = response.data?.values || []
+        if (rows.length < 2) {
+          console.error("[v0] Insufficient data returned for order reload")
+          return null
+        }
+
+        const headers = rows[0]
+        const orderRow = rows[rows.length - 1] // Last row is the order data
+
+        // Cache the headers if not already cached
+        if (!cachedHeadersRef.current[sheet.id]) {
+          cachedHeadersRef.current[sheet.id] = {
+            headers,
+            timestamp: Date.now(),
+            columnMapping,
+          }
+        }
+
+        // Transform the row to an order object
+        const actualDataStartRow = headerRow + 1
+        const rowIndex = existingOrder.rowPosition - actualDataStartRow
+
+        const reloadedOrder = transformRowToOrder(
+          orderRow,
+          headers,
+          columnMapping,
+          sheet.id,
+          rowIndex,
+          actualDataStartRow,
+        )
+
+        if (reloadedOrder) {
+          console.log(`[v0] Successfully reloaded order ${itemId}`)
+
+          // Update the order in state
+          setState((prev) => {
+            const updatedOrders = prev.orders.map((o) =>
+              o.itemId === itemId && o.sheetId === sheet.id ? reloadedOrder : o,
+            )
+
+            let filteredOrders = [...updatedOrders]
+            if (prev.filters.status && prev.filters.status.length > 0) {
+              filteredOrders = filteredOrders.filter((o) => prev.filters.status!.includes(o.status))
+            }
+            if (prev.filters.designer && prev.filters.designer.length > 0) {
+              filteredOrders = filteredOrders.filter((o) => o.designer && prev.filters.designer!.includes(o.designer))
+            }
+            if (prev.filters.productType && prev.filters.productType.length > 0) {
+              filteredOrders = filteredOrders.filter(
+                (o) => o.productType && prev.filters.productType!.includes(o.productType),
+              )
+            }
+            if (prev.filters.store && prev.filters.store.length > 0) {
+              filteredOrders = filteredOrders.filter((o) => o.store && prev.filters.store!.includes(o.store))
+            }
+            if (prev.filters.searchQuery) {
+              const query = prev.filters.searchQuery.toLowerCase()
+              filteredOrders = filteredOrders.filter(
+                (o) =>
+                  o.itemId.toLowerCase().includes(query) ||
+                  o.orderNote?.toLowerCase().includes(query) ||
+                  o.personalization?.toLowerCase().includes(query) ||
+                  o.productName?.toLowerCase().includes(query) ||
+                  o.designer?.toLowerCase().includes(query) ||
+                  o.store?.toLowerCase().includes(query),
+              )
+            }
+
+            return {
+              ...prev,
+              orders: updatedOrders,
+              filteredOrders,
+            }
+          })
+        }
+
+        return reloadedOrder
+      } catch (error) {
+        console.error("[v0] Error reloading order from sheet:", error)
+        return null
+      }
+    },
+    [state.selectedSheet, state.orders, sheets, transformRowToOrder],
+  )
+
   useEffect(() => {
     const savedFilters = loadFiltersFromStorage()
     setState((prev) => ({
@@ -457,7 +576,6 @@ export function useOrderData() {
     }))
   }, [loadFiltersFromStorage])
 
-  // Load orders from selected sheet
   const loadOrdersFromSheet = useCallback(
     async (sheet: Sheet) => {
       const startTime = Date.now()
@@ -477,7 +595,7 @@ export function useOrderData() {
         let actualEndRow: number
 
         if (readDirection === "top-to-bottom") {
-          const maxEndRow = dataRange.endRow || 10000 // Use a large number if no end row specified
+          const maxEndRow = dataRange.endRow || 100000
 
           const dataLoadStartRow = Math.max(headerRow + 1, maxEndRow - maxRowsPerLoad + 1)
           actualEndRow = maxEndRow
@@ -485,7 +603,7 @@ export function useOrderData() {
           range = `${sheet.tab_name}!${startCol}${headerRow}:${endCol}${actualEndRow}`
         } else {
           const dataStartRow = dataRange.startRow || headerRow + 1
-          actualEndRow = Math.min(dataStartRow + maxRowsPerLoad - 1, dataRange.endRow || 1000)
+          actualEndRow = Math.min(dataStartRow + maxRowsPerLoad - 1, dataRange.endRow || 100000)
 
           range = `${sheet.tab_name}!${startCol}${headerRow}:${endCol}${actualEndRow}`
         }
@@ -837,6 +955,7 @@ export function useOrderData() {
     applyFilters,
     refreshData,
     updateOrderStatus,
+    reloadOrderFromSheet,
 
     // API loading state
     apiLoading,

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { LazyImage } from "@/components/ui/lazy-image"
 import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
+import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
   X,
   ChevronLeft,
@@ -23,6 +24,9 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
+  AlertCircle,
+  RefreshCw,
+  FileSpreadsheet,
 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
@@ -53,6 +57,7 @@ export function OrderReviewModal({
   availableStatuses,
   onStatusUpdate,
   reviewMode,
+  isJumpLoading,
 }: OrderReviewModalProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("tabs")
   const [activeTab, setActiveTab] = useState<ActiveTab>("mockup")
@@ -78,6 +83,9 @@ export function OrderReviewModal({
   const [showOrderNoteImages, setShowOrderNoteImages] = useState(false)
   const [jumpItemId, setJumpItemId] = useState("")
   const [jumpError, setJumpError] = useState("")
+  const [showChangesNotification, setShowChangesNotification] = useState(false)
+  const [showItemIdChangeNotification, setShowItemIdChangeNotification] = useState(false)
+  const [sheetGid, setSheetGid] = useState<string | null>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
   const prefetchInProgressRef = useRef(false)
@@ -209,49 +217,42 @@ export function OrderReviewModal({
     setPanX(0)
     setPanY(0)
     setRotation(0)
-    setCurrentStatus(order.status) // Reset currentStatus to match the new order's actual status
-  }, [order.itemId, order.orderNote])
+    setCurrentStatus(order.status)
+
+    if (order._itemIdChanged) {
+      setShowItemIdChangeNotification(true)
+      setShowChangesNotification(false)
+    } else if (order._changes) {
+      setShowChangesNotification(true)
+      setShowItemIdChangeNotification(false)
+    } else {
+      setShowChangesNotification(false)
+      setShowItemIdChangeNotification(false)
+    }
+  }, [order.itemId, order.orderNote, order._changes, order._itemIdChanged])
 
   useEffect(() => {
-    if (!isOpen || !reviewMode || !order) return
-    if (prefetchInProgressRef.current) {
-      console.log("[v0] Prefetch already in progress, skipping")
-      return
-    }
+    if (!reviewMode || prefetchInProgressRef.current) return
 
-    const currentIndex = reviewMode.currentIndex
+    const nextIndex = reviewMode.currentIndex + 1
+    if (nextIndex >= reviewMode.orders.length) return
 
-    const prefetchNextOrders = async () => {
+    const nextOrder = reviewMode.orders[nextIndex]
+
+    const preloadNext = async () => {
       prefetchInProgressRef.current = true
-      const maxPrefetch = 5
-      const totalOrders = reviewMode.orders.length
-
-      for (let i = 1; i <= maxPrefetch; i++) {
-        const nextIndex = currentIndex + i
-
-        if (nextIndex >= totalOrders) {
-          console.log(`[v0] Prefetch complete: reached end of orders at index ${nextIndex - 1}`)
-          break
-        }
-
-        const nextOrder = reviewMode.orders[nextIndex]
-        console.log(`[v0] Prefetching order ${i}/${maxPrefetch}: ${nextOrder.itemId} (index ${nextIndex})`)
-
-        try {
-          await preloadOrderImages(nextOrder)
-          console.log(`[v0] Successfully prefetched order ${nextOrder.itemId}`)
-        } catch (error) {
-          console.error(`[v0] Failed to prefetch order ${nextOrder.itemId}:`, error)
-          // Continue to next order even if one fails
-        }
+      try {
+        console.log("[v0] Preloading images for next order:", nextOrder.itemId)
+        await preloadOrderImages(nextOrder)
+      } catch (error) {
+        console.error("[v0] Failed to preload images for next order:", error)
+      } finally {
+        prefetchInProgressRef.current = false
       }
-
-      console.log(`[v0] Prefetch batch complete`)
-      prefetchInProgressRef.current = false
     }
 
-    prefetchNextOrders()
-  }, [isOpen, reviewMode, order, preloadOrderImages])
+    preloadNext()
+  }, [reviewMode, currentIndex, preloadOrderImages])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -644,6 +645,57 @@ export function OrderReviewModal({
     }
   }
 
+  const getFieldLabel = (field: string): string => {
+    const labels: Record<string, string> = {
+      status: "Status",
+      orderNote: "Order Note",
+      designer: "Designer",
+      designLink: "Design Link",
+      mockup: "Mockup",
+      customerImage: "Customer Image",
+      personalization: "Personalization",
+      productType: "Product Type",
+      productName: "Product Name",
+      store: "Store",
+      productImage: "Product Image",
+    }
+    return labels[field] || field
+  }
+
+  const getSheetCellUrl = () => {
+    if (!selectedSheet || !order.rowPosition || !sheetGid) return null
+
+    // Generate URL that links to the specific row in Google Sheets
+    // Format: https://docs.google.com/spreadsheets/d/{google_sheet_id}/edit#gid={sheetGid}&range=A{row}
+    const baseUrl = `https://docs.google.com/spreadsheets/d/${selectedSheet.google_sheet_id}/edit`
+    const range = `A${order.rowPosition}`
+
+    return `${baseUrl}#gid=${sheetGid}&range=${range}`
+  }
+
+  useEffect(() => {
+    const fetchSheetGid = async () => {
+      if (!selectedSheet?.google_sheet_id || !selectedSheet?.tab_name) {
+        setSheetGid(null)
+        return
+      }
+
+      try {
+        const result = await googleSheetsClient.getSheetTabs(selectedSheet.google_sheet_id)
+        if (result.success && result.data) {
+          const tab = result.data.find((t: any) => t.title === selectedSheet.tab_name)
+          if (tab) {
+            setSheetGid(tab.id.toString())
+          }
+        }
+      } catch (error) {
+        console.error("[OrderReviewModal] Failed to fetch sheet gid:", error)
+      }
+    }
+
+    fetchSheetGid()
+  }, [selectedSheet?.google_sheet_id, selectedSheet?.tab_name])
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
@@ -696,7 +748,8 @@ export function OrderReviewModal({
                   }}
                   onKeyDown={handleJumpKeyDown}
                   placeholder="Jump to Item ID..."
-                  className="h-7 px-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-72"
+                  disabled={isJumpLoading}
+                  className="h-7 px-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-72 disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 {jumpError && (
                   <div className="absolute top-full left-0 mt-1 text-xs text-red-600 whitespace-nowrap bg-white px-2 py-1 rounded shadow-sm border border-red-200">
@@ -708,15 +761,27 @@ export function OrderReviewModal({
                 variant="outline"
                 size="sm"
                 onClick={handleJumpToOrder}
-                className="h-7 px-2 text-xs bg-transparent"
+                disabled={isJumpLoading}
+                className="h-7 px-2 text-xs bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Jump to order by Item ID"
               >
                 Go
               </Button>
+              {isJumpLoading && <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {getSheetCellUrl() && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(getSheetCellUrl()!, "_blank")}
+                title="Open in Google Sheets"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen (F)">
               <Maximize className="h-4 w-4" />
             </Button>
@@ -731,6 +796,89 @@ export function OrderReviewModal({
             </Button>
           </div>
         </div>
+
+        {showItemIdChangeNotification && order._itemIdChanged && (
+          <div className="bg-red-50 border-b border-red-200 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-red-900 mb-1">Row Changed - Different Order Detected</p>
+                <div className="text-xs text-red-800">
+                  <span className="font-medium">Expected Item ID:</span>{" "}
+                  <span className="font-mono bg-red-100 px-1.5 py-0.5 rounded">{order._itemIdChanged}</span>
+                  {" → "}
+                  <span className="font-medium">Current Item ID:</span>{" "}
+                  <span className="font-mono bg-red-100 px-1.5 py-0.5 rounded font-semibold">{order.itemId}</span>
+                </div>
+                <p className="text-xs text-red-700 mt-2">
+                  The sheet data at this row has been updated with a different order. Please check the sheet to verify.
+                </p>
+                {getSheetCellUrl() && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(getSheetCellUrl()!, "_blank")}
+                    className="mt-2 h-7 text-xs bg-white border-red-300 text-red-700 hover:bg-red-100 hover:text-red-800"
+                  >
+                    <FileSpreadsheet className="h-3 w-3 mr-1.5" />
+                    Open Sheet
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowItemIdChangeNotification(false)}
+                className="h-5 w-5 p-0 hover:bg-red-100"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {showChangesNotification && order._changes && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-900 mb-1">Data Updated from Sheet</p>
+                <div className="space-y-1">
+                  {Object.entries(order._changes).map(([field, change]) => (
+                    <div key={field} className="text-xs text-amber-800">
+                      <span className="font-medium">{getFieldLabel(field)}:</span>{" "}
+                      <span className="line-through text-amber-600">{change.old || "(empty)"}</span>
+                      {" → "}
+                      <span className="font-semibold text-amber-900">{change.new || "(empty)"}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-amber-700 mt-2">
+                  Changes detected from sheet. Click below to view in Google Sheets.
+                </p>
+                {getSheetCellUrl() && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(getSheetCellUrl()!, "_blank")}
+                    className="mt-2 h-7 text-xs bg-white border-amber-300 text-amber-700 hover:bg-amber-100 hover:text-amber-800"
+                  >
+                    <FileSpreadsheet className="h-3 w-3 mr-1.5" />
+                    Open Sheet
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChangesNotification(false)}
+                className="h-5 w-5 p-0 hover:bg-amber-100"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="flex h-[calc(100vh-60px)] overflow-hidden">
           {/* Left Panel - Controls */}

@@ -14,6 +14,18 @@ interface ChangelogEntry {
 
 const changelogEntries: ChangelogEntry[] = [
   {
+    version: "1.5.1",
+    date: "2025-01-08",
+    type: "improvement",
+    changes: [
+      "Cải thiện tính năng 'Goto Order' tại màn hình /review: tự động load dữ liệu mới nhất từ Google Sheet khi jump đến order",
+      "Hiển thị order đã lưu ngay lập tức khi nhập order item ID, sau đó load dữ liệu mới trong background",
+      "Thêm icon sync xoay vòng khi đang load dữ liệu từ sheet, thay thế text loading để giao diện đẹp hơn",
+      "Phát hiện và hiển thị thông báo các thay đổi nếu dữ liệu từ sheet khác với dữ liệu đã lưu",
+      "Thông báo thay đổi không tự động ẩn, cho phép người dùng xem kỹ các thay đổi và tự đóng khi muốn",
+    ],
+  },
+  {
     version: "1.5.0",
     date: "2025-11-05",
     type: "feature",

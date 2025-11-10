@@ -14,6 +14,8 @@ export interface Order {
   productType?: string
   productName?: string
   rowPosition?: number // 1-based row number in the Google Sheet
+  _changes?: Record<string, { old: string; new: string }> | null
+  _itemIdChanged?: string // Stores the expected itemId before sync detected a different order
 }
 
 export interface OrderFilters {

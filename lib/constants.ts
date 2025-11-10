@@ -1,2 +1,2 @@
 // Client-side constants
-export const HOME_URL = "/checker"
+export const HOME_URL = "/review"
