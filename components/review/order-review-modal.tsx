@@ -231,6 +231,29 @@ export function OrderReviewModal({
     }
   }, [order.itemId, order.orderNote, order._changes, order._itemIdChanged])
 
+  useEffect(() => {
+    if (!reviewMode || prefetchInProgressRef.current) return
+
+    const nextIndex = reviewMode.currentIndex + 1
+    if (nextIndex >= reviewMode.orders.length) return
+
+    const nextOrder = reviewMode.orders[nextIndex]
+
+    const preloadNext = async () => {
+      prefetchInProgressRef.current = true
+      try {
+        console.log("[v0] Preloading images for next order:", nextOrder.itemId)
+        await preloadOrderImages(nextOrder)
+      } catch (error) {
+        console.error("[v0] Failed to preload images for next order:", error)
+      } finally {
+        prefetchInProgressRef.current = false
+      }
+    }
+
+    preloadNext()
+  }, [reviewMode, currentIndex, preloadOrderImages])
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", {
