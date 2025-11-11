@@ -250,7 +250,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
         top: `${position.y}px`,
         width: `${size.width}px`,
         height: `${size.height}px`,
-        backgroundColor: "rgba(255, 255, 255, 0.95)",
       }}
     >
       {/* Header */}
@@ -316,14 +315,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
         onWheel={handleWheel}
         style={{
           cursor: zoom > 1 ? "grab" : "default",
-          backgroundImage: `
-            linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%),
-            linear-gradient(-45deg, rgba(0,0,0,0.05) 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.05) 75%),
-            linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.05) 75%)
-          `,
-          backgroundSize: "20px 20px",
-          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
         }}
       >
         <div
