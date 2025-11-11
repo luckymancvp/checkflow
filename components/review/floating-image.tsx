@@ -16,7 +16,7 @@ interface FloatingImageProps {
 }
 
 const FLOAT_POSITION_KEY = "orderReviewFloatPosition"
-const CHECKERBOARD_KEY = "orderReviewFloatCheckerboard"
+const FLOAT_BACKGROUND_KEY = "orderReviewFloatBackground"
 
 interface SavedFloatPosition {
   x: number
@@ -39,12 +39,11 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     return { x: 100, y: 100, width: 600, height: 400 }
   }
 
-  const getSavedCheckerboard = (): boolean => {
+  const getSavedBackground = (): boolean => {
     try {
-      const saved = localStorage.getItem(CHECKERBOARD_KEY)
-      return saved === "true"
+      const saved = localStorage.getItem(FLOAT_BACKGROUND_KEY)
+      return saved ? JSON.parse(saved) : false
     } catch (e) {
-      console.error("Failed to load saved checkerboard preference:", e)
       return false
     }
   }
@@ -57,12 +56,12 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
 
+  const [showCheckerboard, setShowCheckerboard] = useState(getSavedBackground())
+
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
-
-  const [showCheckerboard, setShowCheckerboard] = useState(getSavedCheckerboard())
 
   const floatingRef = useRef<HTMLDivElement>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
@@ -78,7 +77,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   }, [position, size])
 
   useEffect(() => {
-    localStorage.setItem(CHECKERBOARD_KEY, String(showCheckerboard))
+    localStorage.setItem(FLOAT_BACKGROUND_KEY, JSON.stringify(showCheckerboard))
   }, [showCheckerboard])
 
   useEffect(() => {
@@ -177,10 +176,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     setPan({ x: 0, y: 0 })
   }
 
-  const toggleCheckerboard = () => {
-    setShowCheckerboard((prev) => !prev)
-  }
-
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
     const delta = e.deltaY > 0 ? -0.1 : 0.1
@@ -192,6 +187,10 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     } else {
       setZoom(newZoom)
     }
+  }
+
+  const toggleBackground = () => {
+    setShowCheckerboard((prev) => !prev)
   }
 
   useEffect(() => {
@@ -286,9 +285,9 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
           <Button
             size="sm"
             variant="ghost"
-            onClick={toggleCheckerboard}
+            onClick={toggleBackground}
             className={`h-6 w-6 p-0 hover:bg-gray-200 ${showCheckerboard ? "bg-gray-200" : ""}`}
-            title="Toggle checkerboard background"
+            title={showCheckerboard ? "Hide checkerboard" : "Show checkerboard"}
           >
             <Grid3x3 className="h-3 w-3" />
           </Button>
@@ -346,10 +345,11 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
         style={{
           cursor: zoom > 1 ? "grab" : "default",
           backgroundImage: showCheckerboard
-            ? "linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)"
+            ? "linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)"
             : "none",
           backgroundSize: showCheckerboard ? "20px 20px" : "auto",
-          backgroundPosition: showCheckerboard ? "0 0, 0 10px, 10px -10px, -10px 0px" : "initial",
+          backgroundPosition: showCheckerboard ? "0 0, 0 10px, 10px -10px, -10px 0px" : "0 0",
+          backgroundColor: showCheckerboard ? "#f9fafb" : "transparent",
         }}
       >
         <div
