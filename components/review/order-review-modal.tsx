@@ -59,7 +59,7 @@ export function OrderReviewModal({
   reviewMode,
   isJumpLoading,
 }: OrderReviewModalProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("tabs")
+  const [viewMode, setViewMode] = useState<ViewMode>("float")
   const [activeTab, setActiveTab] = useState<ActiveTab>("mockup")
   const [zoom, setZoom] = useState(100)
   const [orderNote, setOrderNote] = useState("")
@@ -200,6 +200,9 @@ export function OrderReviewModal({
     const savedViewMode = localStorage.getItem("orderReviewViewMode") as ViewMode
     if (savedViewMode) {
       setViewMode(savedViewMode)
+    } else {
+      setViewMode("float")
+      localStorage.setItem("orderReviewViewMode", "float")
     }
   }, [])
 
@@ -912,6 +915,14 @@ export function OrderReviewModal({
                     }`}
                   >
                     Stack
+                  </button>
+                  <button
+                    onClick={() => handleViewModeChange("float")}
+                    className={`px-2 py-1 rounded text-xs transition-colors ${
+                      viewMode === "float" ? "bg-blue-100 text-blue-700" : "bg-white text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    Float
                   </button>
                 </div>
               </div>
