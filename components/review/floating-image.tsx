@@ -121,6 +121,48 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     setPan({ x: 0, y: 0 })
   }, [activeTab, order.itemId])
 
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        setPosition({
+          x: e.clientX - dragStart.x,
+          y: e.clientY - dragStart.y,
+        })
+      }
+      if (isResizing) {
+        const deltaX = e.clientX - resizeStart.x
+        const deltaY = e.clientY - resizeStart.y
+
+        setSize({
+          width: Math.max(300, resizeStart.width + deltaX),
+          height: Math.max(200, resizeStart.height + deltaY),
+        })
+      }
+      if (isPanning) {
+        setPan({
+          x: e.clientX - panStart.x,
+          y: e.clientY - panStart.y,
+        })
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+      setIsResizing(false)
+      setIsPanning(false)
+    }
+
+    if (isDragging || isResizing || isPanning) {
+      window.addEventListener("mousemove", handleMouseMove)
+      window.addEventListener("mouseup", handleMouseUp)
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+  }, [isDragging, isResizing, isPanning, dragStart, resizeStart, panStart])
+
   const togglePerProductTypeMode = () => {
     const newMode = !perProductTypeMode
     setPerProductTypeMode(newMode)
@@ -140,19 +182,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     })
   }
 
-  const handleDrag = (e: MouseEvent) => {
-    if (isDragging) {
-      setPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
-      })
-    }
-  }
-
-  const handleDragEnd = () => {
-    setIsDragging(false)
-  }
-
   const handleResizeStart = (e: React.MouseEvent) => {
     e.stopPropagation()
     setIsResizing(true)
@@ -164,22 +193,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     })
   }
 
-  const handleResize = (e: MouseEvent) => {
-    if (isResizing) {
-      const deltaX = e.clientX - resizeStart.x
-      const deltaY = e.clientY - resizeStart.y
-
-      setSize({
-        width: Math.max(300, resizeStart.width + deltaX),
-        height: Math.max(200, resizeStart.height + deltaY),
-      })
-    }
-  }
-
-  const handleResizeEnd = () => {
-    setIsResizing(false)
-  }
-
   const handlePanStart = (e: React.MouseEvent) => {
     if (zoom > 1) {
       setIsPanning(true)
@@ -188,19 +201,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
         y: e.clientY - pan.y,
       })
     }
-  }
-
-  const handlePan = (e: MouseEvent) => {
-    if (isPanning) {
-      setPan({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      })
-    }
-  }
-
-  const handlePanEnd = () => {
-    setIsPanning(false)
   }
 
   const handleZoomIn = () => {
@@ -365,7 +365,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
       <div
         ref={imageContainerRef}
         className="w-full h-[calc(100%-40px)] flex items-center justify-center p-2 overflow-hidden relative"
-        onMouseDown={handlePanStart}
         onWheel={handleWheel}
         style={{
           cursor: zoom > 1 ? "grab" : "default",
