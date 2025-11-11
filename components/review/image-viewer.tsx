@@ -490,8 +490,7 @@ export function ImageViewer({
           })()}
         </div>
 
-        {/* Floating Design Window */}
-        <FloatingImage order={order} activeTab="design" getCachedImageUrl={getCachedImageUrl} />
+        {order.designLink && <FloatingImage order={order} activeTab="design" getCachedImageUrl={getCachedImageUrl} />}
       </div>
     )
   }
