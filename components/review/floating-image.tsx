@@ -244,12 +244,13 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   return (
     <div
       ref={floatingRef}
-      className="fixed bg-white rounded-lg shadow-2xl border-2 border-gray-300 overflow-hidden z-50"
+      className="fixed rounded-lg shadow-2xl border-2 border-gray-300 overflow-hidden z-50"
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
         width: `${size.width}px`,
         height: `${size.height}px`,
+        backgroundColor: "rgba(255, 255, 255, 0.95)",
       }}
     >
       {/* Header */}
@@ -310,10 +311,20 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
       {/* Image Content */}
       <div
         ref={imageContainerRef}
-        className="w-full h-[calc(100%-40px)] bg-gray-50 flex items-center justify-center p-2 overflow-hidden relative"
+        className="w-full h-[calc(100%-40px)] flex items-center justify-center p-2 overflow-hidden relative"
         onMouseDown={handlePanStart}
         onWheel={handleWheel}
-        style={{ cursor: zoom > 1 ? "grab" : "default" }}
+        style={{
+          cursor: zoom > 1 ? "grab" : "default",
+          backgroundImage: `
+            linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%),
+            linear-gradient(-45deg, rgba(0,0,0,0.05) 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.05) 75%),
+            linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.05) 75%)
+          `,
+          backgroundSize: "20px 20px",
+          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
+        }}
       >
         <div
           style={{
