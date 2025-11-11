@@ -429,7 +429,11 @@ export function OrderListHeader({
                 <div className="space-y-2">
                   {filterOptions.designers
                     .filter((designer) => (designerCounts[designer] || 0) > 0)
-                    .sort((a, b) => a.localeCompare(b))
+                    .sort((a, b) => {
+                      if (a === "[Blank]") return -1
+                      if (b === "[Blank]") return 1
+                      return a.localeCompare(b)
+                    })
                     .map((designer) => (
                       <label
                         key={designer}
@@ -451,7 +455,9 @@ export function OrderListHeader({
                             }}
                             className="mr-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
-                          <span className="text-sm text-gray-700">{designer}</span>
+                          <span className="text-sm text-gray-700">
+                            {designer === "[Blank]" ? "(No Designer)" : designer}
+                          </span>
                         </div>
                         <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 border-green-200">
                           {designerCounts[designer]}

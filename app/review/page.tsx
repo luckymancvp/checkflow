@@ -163,10 +163,12 @@ export default function ReviewPage() {
       return true
     })
 
-    // Count designers from filtered orders (excluding designer filter)
     ordersForDesignerCount.forEach((order) => {
-      if (order.designer) {
+      if (order.designer && order.designer.trim() !== "") {
         designerCounts[order.designer] = (designerCounts[order.designer] || 0) + 1
+      } else {
+        // Count blank designers with the special marker
+        designerCounts["[Blank]"] = (designerCounts["[Blank]"] || 0) + 1
       }
     })
 
