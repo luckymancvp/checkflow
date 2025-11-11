@@ -18,12 +18,14 @@ interface FloatingImageProps {
 const FLOAT_SETTINGS_KEY = "orderReviewFloatSettings"
 const FLOAT_MODE_KEY = "orderReviewFloatSettingsMode"
 
+type BackgroundMode = "transparent" | "pattern" | "chroma"
+
 interface FloatSettings {
   x: number
   y: number
   width: number
   height: number
-  showCheckerboard: boolean
+  backgroundMode: BackgroundMode
   zoom: number
 }
 
@@ -36,7 +38,7 @@ const DEFAULT_SETTINGS: FloatSettings = {
   y: 100,
   width: 600,
   height: 400,
-  showCheckerboard: false,
+  backgroundMode: "transparent",
   zoom: 1,
 }
 
@@ -56,7 +58,14 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
       if (saved) {
         const allSettings: FloatSettingsByProductType = JSON.parse(saved)
         const key = perProductTypeMode && productType ? productType : "default"
-        return allSettings[key] || DEFAULT_SETTINGS
+        const settings = allSettings[key] || DEFAULT_SETTINGS
+        if ("showCheckerboard" in settings) {
+          return {
+            ...settings,
+            backgroundMode: (settings as any).showCheckerboard ? "pattern" : "transparent",
+          }
+        }
+        return settings
       }
     } catch (e) {
       console.error("Failed to load saved float settings:", e)
@@ -85,7 +94,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
 
-  const [showCheckerboard, setShowCheckerboard] = useState(currentSettings.showCheckerboard)
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>(currentSettings.backgroundMode)
 
   const [zoom, setZoom] = useState(currentSettings.zoom)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -99,7 +108,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     const settings = getSettingsForProductType(order.productType)
     setPosition({ x: settings.x, y: settings.y })
     setSize({ width: settings.width, height: settings.height })
-    setShowCheckerboard(settings.showCheckerboard)
+    setBackgroundMode(settings.backgroundMode)
     setZoom(settings.zoom)
     setPan({ x: 0, y: 0 })
   }, [order.productType, perProductTypeMode])
@@ -110,11 +119,11 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
       y: position.y,
       width: size.width,
       height: size.height,
-      showCheckerboard,
+      backgroundMode,
       zoom,
     }
     saveSettingsForProductType(order.productType, settings)
-  }, [position, size, showCheckerboard, zoom, order.productType, perProductTypeMode])
+  }, [position, size, backgroundMode, zoom, order.productType, perProductTypeMode])
 
   useEffect(() => {
     setZoom(1)
@@ -236,7 +245,17 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   }
 
   const toggleBackground = () => {
-    setShowCheckerboard((prev) => !prev)
+    setBackgroundMode((prev) => {
+      if (prev === "transparent") return "pattern"
+      if (prev === "pattern") return "chroma"
+      return "transparent"
+    })
+  }
+
+  const getBackgroundTitle = () => {
+    if (backgroundMode === "transparent") return "Background: Transparent (click for pattern)"
+    if (backgroundMode === "pattern") return "Background: Pattern (click for chroma blue)"
+    return "Background: Chroma Blue (click for transparent)"
   }
 
   const getImageSource = () => {
@@ -299,8 +318,8 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
             size="sm"
             variant="ghost"
             onClick={toggleBackground}
-            className={`h-6 w-6 p-0 hover:bg-gray-200 ${showCheckerboard ? "bg-gray-200" : ""}`}
-            title={showCheckerboard ? "Hide checkerboard" : "Show checkerboard"}
+            className={`h-6 w-6 p-0 hover:bg-gray-200 ${backgroundMode !== "transparent" ? "bg-gray-200" : ""}`}
+            title={getBackgroundTitle()}
           >
             <Grid3x3 className="h-3 w-3" />
           </Button>
@@ -368,12 +387,14 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
         onWheel={handleWheel}
         style={{
           cursor: zoom > 1 ? "grab" : "default",
-          backgroundImage: showCheckerboard
-            ? "linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)"
-            : "none",
-          backgroundSize: showCheckerboard ? "20px 20px" : "auto",
-          backgroundPosition: showCheckerboard ? "0 0, 0 10px, 10px -10px, -10px 0px" : "0 0",
-          backgroundColor: showCheckerboard ? "#f9fafb" : "transparent",
+          backgroundImage:
+            backgroundMode === "pattern"
+              ? "linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)"
+              : "none",
+          backgroundSize: backgroundMode === "pattern" ? "20px 20px" : "auto",
+          backgroundPosition: backgroundMode === "pattern" ? "0 0, 0 10px, 10px -10px, -10px 0px" : "0 0",
+          backgroundColor:
+            backgroundMode === "pattern" ? "#f9fafb" : backgroundMode === "chroma" ? "#00ff00" : "transparent",
         }}
       >
         <div
