@@ -15,7 +15,7 @@ interface FloatingImageProps {
   getCachedImageUrl: (url: string | null) => string | null
 }
 
-const FLOAT_POSITION_KEY = "orderReviewFloatPosition"
+const FLOAT_POSITION_BASE_KEY = "orderReviewFloatPosition"
 const FLOAT_BACKGROUND_KEY = "orderReviewFloatBackground"
 
 interface SavedFloatPosition {
@@ -26,9 +26,11 @@ interface SavedFloatPosition {
 }
 
 export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingImageProps) {
-  const getSavedPosition = (): SavedFloatPosition => {
+  const getStorageKey = (tab: ActiveTab) => `${FLOAT_POSITION_BASE_KEY}_${tab}`
+
+  const getSavedPosition = (tab: ActiveTab): SavedFloatPosition => {
     try {
-      const saved = localStorage.getItem(FLOAT_POSITION_KEY)
+      const saved = localStorage.getItem(getStorageKey(tab))
       if (saved) {
         return JSON.parse(saved)
       }
@@ -48,7 +50,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     }
   }
 
-  const savedPos = getSavedPosition()
+  const savedPos = getSavedPosition(activeTab)
   const [position, setPosition] = useState({ x: savedPos.x, y: savedPos.y })
   const [size, setSize] = useState({ width: savedPos.width, height: savedPos.height })
   const [isDragging, setIsDragging] = useState(false)
@@ -73,14 +75,17 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
       width: size.width,
       height: size.height,
     }
-    localStorage.setItem(FLOAT_POSITION_KEY, JSON.stringify(savedPosition))
-  }, [position, size])
+    localStorage.setItem(getStorageKey(activeTab), JSON.stringify(savedPosition))
+  }, [position, size, activeTab])
 
   useEffect(() => {
     localStorage.setItem(FLOAT_BACKGROUND_KEY, JSON.stringify(showCheckerboard))
   }, [showCheckerboard])
 
   useEffect(() => {
+    const savedPos = getSavedPosition(activeTab)
+    setPosition({ x: savedPos.x, y: savedPos.y })
+    setSize({ width: savedPos.width, height: savedPos.height })
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }, [activeTab, order.itemId])
