@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { LazyImage } from "@/components/ui/lazy-image"
-import { ExternalLink, ZoomIn, ZoomOut, Maximize2 } from "lucide-react"
+import { ExternalLink, ZoomIn, ZoomOut, Maximize2, Grid3x3 } from "lucide-react"
 import type { Order } from "@/types/order"
 import type { ActiveTab } from "@/types/order-review"
 import { getImageUrl } from "@/utils/image-utils"
@@ -16,6 +16,7 @@ interface FloatingImageProps {
 }
 
 const FLOAT_POSITION_KEY = "orderReviewFloatPosition"
+const CHECKERBOARD_KEY = "orderReviewFloatCheckerboard"
 
 interface SavedFloatPosition {
   x: number
@@ -38,6 +39,16 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     return { x: 100, y: 100, width: 600, height: 400 }
   }
 
+  const getSavedCheckerboard = (): boolean => {
+    try {
+      const saved = localStorage.getItem(CHECKERBOARD_KEY)
+      return saved === "true"
+    } catch (e) {
+      console.error("Failed to load saved checkerboard preference:", e)
+      return false
+    }
+  }
+
   const savedPos = getSavedPosition()
   const [position, setPosition] = useState({ x: savedPos.x, y: savedPos.y })
   const [size, setSize] = useState({ width: savedPos.width, height: savedPos.height })
@@ -51,6 +62,8 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
 
+  const [showCheckerboard, setShowCheckerboard] = useState(getSavedCheckerboard())
+
   const floatingRef = useRef<HTMLDivElement>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
 
@@ -63,6 +76,10 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     }
     localStorage.setItem(FLOAT_POSITION_KEY, JSON.stringify(savedPosition))
   }, [position, size])
+
+  useEffect(() => {
+    localStorage.setItem(CHECKERBOARD_KEY, String(showCheckerboard))
+  }, [showCheckerboard])
 
   useEffect(() => {
     setZoom(1)
@@ -158,6 +175,10 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   const handleResetZoom = () => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
+  }
+
+  const toggleCheckerboard = () => {
+    setShowCheckerboard((prev) => !prev)
   }
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -265,6 +286,15 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
           <Button
             size="sm"
             variant="ghost"
+            onClick={toggleCheckerboard}
+            className={`h-6 w-6 p-0 hover:bg-gray-200 ${showCheckerboard ? "bg-gray-200" : ""}`}
+            title="Toggle checkerboard background"
+          >
+            <Grid3x3 className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={handleZoomOut}
             disabled={zoom <= 1}
             className="h-6 w-6 p-0 hover:bg-gray-200"
@@ -315,6 +345,11 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
         onWheel={handleWheel}
         style={{
           cursor: zoom > 1 ? "grab" : "default",
+          backgroundImage: showCheckerboard
+            ? "linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)"
+            : "none",
+          backgroundSize: showCheckerboard ? "20px 20px" : "auto",
+          backgroundPosition: showCheckerboard ? "0 0, 0 10px, 10px -10px, -10px 0px" : "initial",
         }}
       >
         <div
