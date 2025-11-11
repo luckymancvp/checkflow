@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { LazyImage } from "@/components/ui/lazy-image"
-import { ExternalLink, ZoomIn, ZoomOut, Maximize2, Grid3x3 } from "lucide-react"
+import { ExternalLink, ZoomIn, ZoomOut, Maximize2, Grid3x3, Layers } from "lucide-react"
 import type { Order } from "@/types/order"
 import type { ActiveTab } from "@/types/order-review"
 import { getImageUrl } from "@/utils/image-utils"
@@ -16,6 +16,7 @@ interface FloatingImageProps {
 }
 
 const FLOAT_SETTINGS_KEY = "orderReviewFloatSettings"
+const FLOAT_MODE_KEY = "orderReviewFloatSettingsMode"
 
 interface FloatSettings {
   x: number
@@ -40,12 +41,21 @@ const DEFAULT_SETTINGS: FloatSettings = {
 }
 
 export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingImageProps) {
+  const [perProductTypeMode, setPerProductTypeMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem(FLOAT_MODE_KEY)
+      return saved === "true"
+    } catch {
+      return false
+    }
+  })
+
   const getSettingsForProductType = (productType?: string): FloatSettings => {
     try {
       const saved = localStorage.getItem(FLOAT_SETTINGS_KEY)
       if (saved) {
         const allSettings: FloatSettingsByProductType = JSON.parse(saved)
-        const key = productType || "default"
+        const key = perProductTypeMode && productType ? productType : "default"
         return allSettings[key] || DEFAULT_SETTINGS
       }
     } catch (e) {
@@ -58,7 +68,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     try {
       const saved = localStorage.getItem(FLOAT_SETTINGS_KEY)
       const allSettings: FloatSettingsByProductType = saved ? JSON.parse(saved) : {}
-      const key = productType || "default"
+      const key = perProductTypeMode && productType ? productType : "default"
       allSettings[key] = settings
       localStorage.setItem(FLOAT_SETTINGS_KEY, JSON.stringify(allSettings))
     } catch (e) {
@@ -92,7 +102,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     setShowCheckerboard(settings.showCheckerboard)
     setZoom(settings.zoom)
     setPan({ x: 0, y: 0 })
-  }, [order.productType])
+  }, [order.productType, perProductTypeMode])
 
   useEffect(() => {
     const settings: FloatSettings = {
@@ -104,12 +114,22 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
       zoom,
     }
     saveSettingsForProductType(order.productType, settings)
-  }, [position, size, showCheckerboard, zoom, order.productType])
+  }, [position, size, showCheckerboard, zoom, order.productType, perProductTypeMode])
 
   useEffect(() => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }, [activeTab, order.itemId])
+
+  const togglePerProductTypeMode = () => {
+    const newMode = !perProductTypeMode
+    setPerProductTypeMode(newMode)
+    try {
+      localStorage.setItem(FLOAT_MODE_KEY, String(newMode))
+    } catch (e) {
+      console.error("Failed to save float mode:", e)
+    }
+  }
 
   const handleDragStart = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).classList.contains("resize-handle")) return
@@ -219,39 +239,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
     setShowCheckerboard((prev) => !prev)
   }
 
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("mousemove", handleDrag)
-      window.addEventListener("mouseup", handleDragEnd)
-    }
-    return () => {
-      window.removeEventListener("mousemove", handleDrag)
-      window.removeEventListener("mouseup", handleDragEnd)
-    }
-  }, [isDragging, dragStart])
-
-  useEffect(() => {
-    if (isResizing) {
-      window.addEventListener("mousemove", handleResize)
-      window.addEventListener("mouseup", handleResizeEnd)
-    }
-    return () => {
-      window.removeEventListener("mousemove", handleResize)
-      window.removeEventListener("mouseup", handleResizeEnd)
-    }
-  }, [isResizing, resizeStart])
-
-  useEffect(() => {
-    if (isPanning) {
-      window.addEventListener("mousemove", handlePan)
-      window.addEventListener("mouseup", handlePanEnd)
-    }
-    return () => {
-      window.removeEventListener("mousemove", handlePan)
-      window.removeEventListener("mouseup", handlePanEnd)
-    }
-  }, [isPanning, panStart])
-
   const getImageSource = () => {
     switch (activeTab) {
       case "product":
@@ -320,6 +307,19 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
           <Button
             size="sm"
             variant="ghost"
+            onClick={togglePerProductTypeMode}
+            className={`h-6 w-6 p-0 hover:bg-gray-200 ${perProductTypeMode ? "bg-blue-200" : ""}`}
+            title={
+              perProductTypeMode
+                ? "Settings per product type (click to use global)"
+                : "Global settings (click to use per product type)"
+            }
+          >
+            <Layers className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={handleZoomOut}
             disabled={zoom <= 1}
             className="h-6 w-6 p-0 hover:bg-gray-200"
@@ -327,7 +327,6 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
           >
             <ZoomOut className="h-3 w-3" />
           </Button>
-          <span className="text-xs text-gray-600 min-w-[3rem] text-center">{Math.round(zoom * 100)}%</span>
           <Button
             size="sm"
             variant="ghost"
