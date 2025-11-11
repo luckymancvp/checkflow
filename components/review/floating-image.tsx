@@ -15,52 +15,69 @@ interface FloatingImageProps {
   getCachedImageUrl: (url: string | null) => string | null
 }
 
-const FLOAT_POSITION_BASE_KEY = "orderReviewFloatPosition"
-const FLOAT_BACKGROUND_KEY = "orderReviewFloatBackground"
+const FLOAT_SETTINGS_KEY = "orderReviewFloatSettings"
 
-interface SavedFloatPosition {
+interface FloatSettings {
   x: number
   y: number
   width: number
   height: number
+  showCheckerboard: boolean
+  zoom: number
+}
+
+interface FloatSettingsByProductType {
+  [productType: string]: FloatSettings
+}
+
+const DEFAULT_SETTINGS: FloatSettings = {
+  x: 100,
+  y: 100,
+  width: 600,
+  height: 400,
+  showCheckerboard: false,
+  zoom: 1,
 }
 
 export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingImageProps) {
-  const getStorageKey = (tab: ActiveTab) => `${FLOAT_POSITION_BASE_KEY}_${tab}`
-
-  const getSavedPosition = (tab: ActiveTab): SavedFloatPosition => {
+  const getSettingsForProductType = (productType?: string): FloatSettings => {
     try {
-      const saved = localStorage.getItem(getStorageKey(tab))
+      const saved = localStorage.getItem(FLOAT_SETTINGS_KEY)
       if (saved) {
-        return JSON.parse(saved)
+        const allSettings: FloatSettingsByProductType = JSON.parse(saved)
+        const key = productType || "default"
+        return allSettings[key] || DEFAULT_SETTINGS
       }
     } catch (e) {
-      console.error("Failed to load saved float position:", e)
+      console.error("Failed to load saved float settings:", e)
     }
-    // Default position
-    return { x: 100, y: 100, width: 600, height: 400 }
+    return DEFAULT_SETTINGS
   }
 
-  const getSavedBackground = (): boolean => {
+  const saveSettingsForProductType = (productType: string | undefined, settings: FloatSettings) => {
     try {
-      const saved = localStorage.getItem(FLOAT_BACKGROUND_KEY)
-      return saved ? JSON.parse(saved) : false
+      const saved = localStorage.getItem(FLOAT_SETTINGS_KEY)
+      const allSettings: FloatSettingsByProductType = saved ? JSON.parse(saved) : {}
+      const key = productType || "default"
+      allSettings[key] = settings
+      localStorage.setItem(FLOAT_SETTINGS_KEY, JSON.stringify(allSettings))
     } catch (e) {
-      return false
+      console.error("Failed to save float settings:", e)
     }
   }
 
-  const savedPos = getSavedPosition(activeTab)
-  const [position, setPosition] = useState({ x: savedPos.x, y: savedPos.y })
-  const [size, setSize] = useState({ width: savedPos.width, height: savedPos.height })
+  const currentSettings = getSettingsForProductType(order.productType)
+
+  const [position, setPosition] = useState({ x: currentSettings.x, y: currentSettings.y })
+  const [size, setSize] = useState({ width: currentSettings.width, height: currentSettings.height })
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
 
-  const [showCheckerboard, setShowCheckerboard] = useState(getSavedBackground())
+  const [showCheckerboard, setShowCheckerboard] = useState(currentSettings.showCheckerboard)
 
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(currentSettings.zoom)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
@@ -69,23 +86,27 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   const imageContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const savedPosition: SavedFloatPosition = {
+    const settings = getSettingsForProductType(order.productType)
+    setPosition({ x: settings.x, y: settings.y })
+    setSize({ width: settings.width, height: settings.height })
+    setShowCheckerboard(settings.showCheckerboard)
+    setZoom(settings.zoom)
+    setPan({ x: 0, y: 0 })
+  }, [order.productType])
+
+  useEffect(() => {
+    const settings: FloatSettings = {
       x: position.x,
       y: position.y,
       width: size.width,
       height: size.height,
+      showCheckerboard,
+      zoom,
     }
-    localStorage.setItem(getStorageKey(activeTab), JSON.stringify(savedPosition))
-  }, [position, size, activeTab])
+    saveSettingsForProductType(order.productType, settings)
+  }, [position, size, showCheckerboard, zoom, order.productType])
 
   useEffect(() => {
-    localStorage.setItem(FLOAT_BACKGROUND_KEY, JSON.stringify(showCheckerboard))
-  }, [showCheckerboard])
-
-  useEffect(() => {
-    const savedPos = getSavedPosition(activeTab)
-    setPosition({ x: savedPos.x, y: savedPos.y })
-    setSize({ width: savedPos.width, height: savedPos.height })
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }, [activeTab, order.itemId])
