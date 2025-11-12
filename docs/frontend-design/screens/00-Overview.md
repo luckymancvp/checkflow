@@ -49,17 +49,17 @@ CheckFlow follows a consistent layout pattern with two main types of screens:
 ## Layout Architecture
 
 ### Login Screen
-\`\`\`
+```
 ┌─────────────────────────────────────────────────────────┐
 │                                                         │
 │                  Full Screen Layout                     │
 │                Authentication Interface                 │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
-\`\`\`
+```
 
 ### Protected Screens
-\`\`\`
+```
 ┌─────────────────────────────────────────────────────────┐
 │ Sidebar │ Main Content Area                             │
 │         │                                               │
@@ -68,7 +68,7 @@ CheckFlow follows a consistent layout pattern with two main types of screens:
 │ - User  │                                               │
 │         │                                               │
 └─────────────────────────────────────────────────────────┘
-\`\`\`
+```
 
 ## Screen Documentation Guidelines
 

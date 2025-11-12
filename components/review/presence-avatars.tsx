@@ -1,81 +1,72 @@
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import type { UserPresence } from "@/hooks/use-presence"
-import { Users } from "lucide-react"
+import type { UserPresence } from "@/hooks/use-order-review-presence"
+import type { GlobalUserPresence } from "@/hooks/use-global-presence"
 
 interface PresenceAvatarsProps {
-  users: UserPresence[]
-  maxDisplay?: number
+  users: (UserPresence | GlobalUserPresence)[]
   label?: string
+  maxDisplay?: number
 }
 
-export function PresenceAvatars({ users, maxDisplay = 5, label }: PresenceAvatarsProps) {
+export function PresenceAvatars({ users, label = "reviewing", maxDisplay = 5 }: PresenceAvatarsProps) {
   const displayUsers = users.slice(0, maxDisplay)
-  const remainingCount = users.length - maxDisplay
+  const remainingCount = Math.max(0, users.length - maxDisplay)
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2)
+  }
+
+  const getStatusIndicator = (user: UserPresence | GlobalUserPresence) => {
+    if ("status" in user && user.status === "typing") {
+      return (
+        <div
+          className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-white animate-pulse"
+          title="Typing..."
+        />
+      )
+    }
+    return (
+      <div className="absolute bottom-0 right-0 w-2 h-2 bg-blue-500 rounded-full border border-white" title="Active" />
+    )
+  }
 
   if (users.length === 0) {
     return null
   }
 
-  const getInitials = (name: string) => {
-    const parts = name.split(" ")
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-    }
-    return name.slice(0, 2).toUpperCase()
-  }
-
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="flex items-center gap-2">
-        {label && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-            <Users className="h-3.5 w-3.5" />
-            <span className="font-medium">{label}:</span>
+    <div className="flex items-center gap-2 ml-4 border-l pl-4 border-gray-200">
+      <div className="flex -space-x-2">
+        {displayUsers.map((user) => (
+          <div key={user.id} title={user.user_name} className="relative">
+            <Avatar className="w-7 h-7 border-2 border-white">
+              <AvatarImage src={user.user_avatar || undefined} alt={user.user_name} />
+              <AvatarFallback className="text-xs bg-blue-100 text-blue-700">
+                {getInitials(user.user_name)}
+              </AvatarFallback>
+            </Avatar>
+            {getStatusIndicator(user)}
+          </div>
+        ))}
+        {remainingCount > 0 && (
+          <div
+            className="relative w-7 h-7 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center"
+            title={`+${remainingCount} more`}
+          >
+            <span className="text-xs font-semibold text-gray-600">+{remainingCount}</span>
           </div>
         )}
-        <div className="flex items-center -space-x-2">
-          {displayUsers.map((user) => (
-            <Tooltip key={user.user_id}>
-              <TooltipTrigger asChild>
-                <div className="relative">
-                  <Avatar className="h-7 w-7 border-2 border-white ring-1 ring-gray-200 hover:ring-2 hover:ring-blue-400 transition-all cursor-pointer">
-                    <AvatarImage src={user.user_avatar || undefined} alt={user.user_name} />
-                    <AvatarFallback className="text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                      {getInitials(user.user_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full animate-pulse" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                <div className="space-y-1">
-                  <p className="font-semibold">{user.user_name}</p>
-                  {user.user_email && <p className="text-gray-400">{user.user_email}</p>}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          ))}
-          {remainingCount > 0 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center justify-center h-7 w-7 rounded-full bg-gray-200 border-2 border-white text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-300 transition-colors">
-                  +{remainingCount}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                <div className="space-y-1">
-                  {users.slice(maxDisplay).map((user) => (
-                    <p key={user.user_id}>{user.user_name}</p>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
       </div>
-    </TooltipProvider>
+      <span className="text-xs text-gray-500">
+        {users.length} {label}
+      </span>
+    </div>
   )
 }

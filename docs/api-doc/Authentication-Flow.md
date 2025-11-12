@@ -20,7 +20,7 @@ CheckFlow uses direct Google OAuth 2.0 authentication without Supabase Auth libr
 ## Authentication Flow Stages
 
 ### Stage 1: Initial Login Request
-\`\`\`
+```
 ┌─────────────────────────────────────────────────────────���
 │ Client (Login Page)                                     │
 ├─────────────────────────────────────────────────────────┤
@@ -36,10 +36,10 @@ CheckFlow uses direct Google OAuth 2.0 authentication without Supabase Auth libr
 │ 2. Redirect client to Google OAuth URL                 │
 │ 3. Include required scopes and parameters              │
 └─────────────────────────────────────────────────────────┘
-\`\`\`
+```
 
 ### Stage 2: Google OAuth Flow
-\`\`\`
+```
 ┌─────────────────────────────────────────────────────────┐
 │ Google OAuth Server                                     │
 ├─────────────────────────────────────────────────────────┤
@@ -59,10 +59,10 @@ CheckFlow uses direct Google OAuth 2.0 authentication without Supabase Auth libr
 │ 4. Fetch user profile from Google                      │
 │ 5. Discard Google tokens after profile fetch          │
 └─────────────────────────────────────────────────────────┘
-\`\`\`
+```
 
 ### Stage 3: User Validation and Session Creation
-\`\`\`
+```
 ┌─────────────────────────────────────────────────────────┐
 │ Server (User Processing)                                │
 ├─────────────────────────────────────────────────────────┤
@@ -80,7 +80,7 @@ CheckFlow uses direct Google OAuth 2.0 authentication without Supabase Auth libr
 │ 3. Redirect to main dashboard                          │
 │ 4. Begin authenticated session                         │
 └─────────────────────────────────────────────────────────┘
-\`\`\`
+```
 
 ## Detailed Flow Components
 
@@ -104,14 +104,14 @@ CheckFlow uses direct Google OAuth 2.0 authentication without Supabase Auth libr
 - Redirect client to Google OAuth URL
 
 **Signed JWT State Generation**:
-\`\`\`javascript
+```javascript
 const stateData = {
   timestamp: Date.now(),
   nonce: crypto.randomBytes(16).toString('hex'),
   ip: req.ip
 }
 const state = jwt.sign(stateData, process.env.JWT_SECRET, { expiresIn: '10m' })
-\`\`\`
+```
 
 **OAuth URL Parameters**:
 - `client_id`: Google OAuth client ID
@@ -132,7 +132,7 @@ const state = jwt.sign(stateData, process.env.JWT_SECRET, { expiresIn: '10m' })
 - Discard Google tokens after profile fetch
 
 **State Verification (No Database Lookup)**:
-\`\`\`javascript
+```javascript
 try {
   const stateData = jwt.verify(state, process.env.JWT_SECRET)
   const timeDiff = Date.now() - stateData.timestamp
@@ -141,7 +141,7 @@ try {
 } catch (error) {
   // Invalid state, reject request
 }
-\`\`\`
+```
 
 **Security Validations**:
 - JWT signature verification (CSRF protection)
@@ -197,13 +197,13 @@ try {
 ## API Endpoints
 
 ### Authentication Endpoints
-\`\`\`
+```
 GET  /api/auth/google          - Initiate Google OAuth flow
 GET  /api/auth/callback        - Handle Google OAuth callback
 POST /api/auth/logout          - Logout and clear cookie
 GET  /api/auth/me              - Get current user profile
 POST /api/auth/test            - Test login
-\`\`\`
+```
 
 ### Test Authentication Endpoint
 **Endpoint**: `POST /api/auth/test`
@@ -211,11 +211,11 @@ POST /api/auth/test            - Test login
 **Purpose**: Development testing without Google OAuth
 
 **Request Body**:
-\`\`\`json
+```json
 {
   "action": "login"
 }
-\`\`\`
+```
 
 **Server Actions**:
 - Check if test user exists in database
@@ -230,7 +230,7 @@ POST /api/auth/test            - Test login
 - Google ID: test-google-id-123
 
 **Response** (Same as Google OAuth):
-\`\`\`json
+```json
 {
   "success": true,
   "user": {
@@ -243,7 +243,7 @@ POST /api/auth/test            - Test login
   },
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
-\`\`\`
+```
 
 **Usage**:
 - Only available in development environment
@@ -306,7 +306,7 @@ POST /api/auth/test            - Test login
 ## Database Schema
 
 ### Users Table
-\`\`\`sql
+```sql
 users (
   id UUID PRIMARY KEY,
   google_id VARCHAR UNIQUE NOT NULL,
@@ -320,7 +320,7 @@ users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login TIMESTAMP
 )
-\`\`\`
+```
 
 ## Client-Side Implementation
 

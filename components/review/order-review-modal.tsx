@@ -10,8 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { LazyImage } from "@/components/ui/lazy-image"
 import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
-import { usePresence } from "@/hooks/use-presence"
-import { PresenceAvatars } from "@/components/review/presence-avatars"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
   X,
@@ -43,6 +41,9 @@ import { ImageViewer } from "./image-viewer"
 import { KeyboardShortcuts } from "./keyboard-shortcuts"
 import { OrderDetailsPanel } from "./order-details-panel"
 import { STORAGE_KEY, DEFAULT_WIDTHS } from "@/constants/review-modal"
+import { useOrderReviewPresence } from "@/hooks/use-order-review-presence"
+import { useGlobalPresence } from "@/hooks/use-global-presence"
+import { PresenceAvatars } from "./presence-avatars"
 
 export function OrderReviewModal({
   isOpen,
@@ -94,14 +95,8 @@ export function OrderReviewModal({
 
   const { preloadOrderImages, getCachedImageUrl } = useImageCache()
 
-  const {
-    onlineUsers,
-    reviewingUsers,
-    loading: presenceLoading,
-  } = usePresence({
-    orderItemId: order.itemId,
-    enableTracking: isOpen, // Only track when modal is open
-  })
+  const { reviewingUsers, setTypingStatus } = useOrderReviewPresence(order.itemId, isOpen)
+  const { onlineUsers } = useGlobalPresence(isOpen)
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -710,6 +705,11 @@ export function OrderReviewModal({
     fetchSheetGid()
   }, [selectedSheet?.google_sheet_id, selectedSheet?.tab_name])
 
+  const handleOrderNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setOrderNote(e.target.value)
+    setTypingStatus()
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
@@ -784,10 +784,9 @@ export function OrderReviewModal({
               {isJumpLoading && <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />}
             </div>
 
-            <div className="flex items-center gap-4 ml-4 border-l pl-4 border-gray-200">
-              {reviewingUsers.length > 0 && <PresenceAvatars users={reviewingUsers} maxDisplay={3} label="Reviewing" />}
-              {onlineUsers.length > 0 && <PresenceAvatars users={onlineUsers} maxDisplay={5} label="Online" />}
-            </div>
+            <PresenceAvatars users={reviewingUsers} label="reviewing" maxDisplay={5} />
+
+            <PresenceAvatars users={onlineUsers} label="online" maxDisplay={3} />
           </div>
 
           <div className="flex items-center gap-2">
@@ -977,7 +976,7 @@ export function OrderReviewModal({
                 <Textarea
                   ref={orderNoteTextareaRef}
                   value={orderNote}
-                  onChange={(e) => setOrderNote(e.target.value)}
+                  onChange={handleOrderNoteChange}
                   placeholder="Add or edit order note..."
                   className="min-h-[60px] text-xs bg-white"
                 />
