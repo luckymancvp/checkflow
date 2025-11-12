@@ -47,7 +47,7 @@ export function PresenceAvatars({ users, maxDisplay = 5, label }: PresenceAvatar
                       {getInitials(user.user_name)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full animate-pulse" />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
