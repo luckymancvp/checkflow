@@ -98,6 +98,8 @@ export function OrderReviewModal({
   const { reviewingUsers, setTypingStatus } = useOrderReviewPresence(order.itemId, isOpen)
   // const { onlineUsers } = useGlobalPresence(isOpen)
 
+  const hasReviewConflict = reviewingUsers.length > 1
+
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
@@ -714,10 +716,16 @@ export function OrderReviewModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white">
+        <div
+          className={`flex items-center justify-between px-4 py-2 border-b bg-white ${
+            hasReviewConflict ? "border-purple-500 border-b-4 bg-purple-50" : "border-gray-200"
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-gray-900">#{order.itemId}</h2>
+              <h2 className={`text-lg font-semibold ${hasReviewConflict ? "text-purple-900" : "text-gray-900"}`}>
+                #{order.itemId}
+              </h2>
               <Button variant="ghost" size="sm" onClick={handleCopyItemId} className="h-6 w-6 p-0 hover:bg-gray-100">
                 {copiedItemId ? (
                   <CheckCheck className="h-3 w-3 text-green-600" />
@@ -783,6 +791,13 @@ export function OrderReviewModal({
               </Button>
               {isJumpLoading && <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />}
             </div>
+
+            {hasReviewConflict && (
+              <Badge className="bg-purple-100 text-purple-900 border-purple-300 font-semibold animate-pulse">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Multiple Reviewers
+              </Badge>
+            )}
 
             <PresenceAvatars users={reviewingUsers} label="reviewing" maxDisplay={5} />
           </div>
