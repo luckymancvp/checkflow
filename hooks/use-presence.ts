@@ -32,25 +32,40 @@ export function usePresence(options: UsePresenceOptions = {}) {
   const channelRef = useRef<RealtimeChannel | null>(null)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
+  console.log("[v0] usePresence initialized", {
+    userId: user?.id,
+    orderItemId,
+    enableTracking,
+    hasSupabaseUrl: !!supabaseUrl,
+    hasSupabaseKey: !!supabaseAnonKey,
+  })
+
   // Initialize Supabase client once
   useEffect(() => {
     if (!supabaseRef.current) {
       supabaseRef.current = createClient(supabaseUrl, supabaseAnonKey)
+      console.log("[v0] Supabase client created")
     }
   }, [])
 
   useEffect(() => {
     if (!user || !enableTracking || !supabaseRef.current) {
+      console.log("[v0] Presence tracking disabled", {
+        hasUser: !!user,
+        enableTracking,
+        hasSupabase: !!supabaseRef.current,
+      })
       setLoading(false)
       return
     }
 
+    console.log("[v0] Setting up presence channel for user:", user.id)
     const supabase = supabaseRef.current
 
     const channel = supabase.channel("global-presence", {
       config: {
         presence: {
-          key: user.id, // Use user_id as the unique key
+          key: user.id,
         },
       },
     })
@@ -58,12 +73,13 @@ export function usePresence(options: UsePresenceOptions = {}) {
     channel
       .on("presence", { event: "sync" }, () => {
         const presenceState = channel.presenceState()
+        console.log("[v0] Presence sync event", { presenceState })
+
         const allUsers: UserPresence[] = []
 
         Object.keys(presenceState).forEach((userId) => {
           const presences = presenceState[userId] as any[]
           if (presences && presences.length > 0) {
-            // Take the most recent presence
             const presence = presences[0]
             allUsers.push({
               user_id: userId,
@@ -77,11 +93,15 @@ export function usePresence(options: UsePresenceOptions = {}) {
           }
         })
 
+        console.log("[v0] All users from presence:", allUsers)
+
         const others = allUsers.filter((u) => u.user_id !== user.id)
+        console.log("[v0] Other users (excluding self):", others)
         setOnlineUsers(others)
 
         if (orderItemId) {
           const reviewing = others.filter((u) => u.order_item_id === orderItemId)
+          console.log("[v0] Users reviewing same order:", reviewing)
           setReviewingUsers(reviewing)
         } else {
           setReviewingUsers([])
@@ -96,21 +116,29 @@ export function usePresence(options: UsePresenceOptions = {}) {
         console.log("[v0] User left presence:", leftPresences)
       })
       .subscribe(async (status) => {
+        console.log("[v0] Channel subscription status:", status)
+
         if (status === "SUBSCRIBED") {
-          await channel.track({
+          const trackData = {
             user_id: user.id,
             user_name: user.name,
             user_avatar: user.avatar_url || null,
             user_email: user.email,
             order_item_id: orderItemId,
             online_at: Date.now(),
-          })
+          }
+          console.log("[v0] Tracking presence with data:", trackData)
+
+          await channel.track(trackData)
+          console.log("[v0] Presence tracked successfully")
         }
       })
 
     channelRef.current = channel
 
     return () => {
+      console.log("[v0] Cleaning up presence channel")
+      channel.untrack()
       channel.unsubscribe()
     }
   }, [user, orderItemId, enableTracking])
@@ -120,14 +148,17 @@ export function usePresence(options: UsePresenceOptions = {}) {
 
     const channel = channelRef.current
 
-    channel.track({
+    const trackData = {
       user_id: user.id,
       user_name: user.name,
       user_avatar: user.avatar_url || null,
       user_email: user.email,
       order_item_id: orderItemId,
       online_at: Date.now(),
-    })
+    }
+
+    console.log("[v0] Updating presence for order item change:", trackData)
+    channel.track(trackData)
   }, [orderItemId, user, enableTracking])
 
   const refresh = useCallback(() => {
