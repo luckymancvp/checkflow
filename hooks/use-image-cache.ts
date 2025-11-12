@@ -32,22 +32,29 @@ export function useImageCache() {
   const preloadOrderImages = useCallback(
     async (orderToPreload: Order) => {
       const mockupUrl = getImageUrl(orderToPreload.mockup, "mockup")
+      const designUrl = getImageUrl(orderToPreload.designLink, "design")
 
-      if (!mockupUrl) return
+      const imagesToPreload = [
+        { url: mockupUrl, type: "mockup" },
+        { url: designUrl, type: "design" },
+      ]
 
-      if (!isGoogleDriveUrl(mockupUrl)) return
+      for (const { url, type } of imagesToPreload) {
+        if (!url) continue
+        if (!isGoogleDriveUrl(url)) continue
 
-      console.log(`[v0] Preloading mockup image for next order:`, orderToPreload.itemId)
+        console.log(`[v0] Preloading ${type} image for next order:`, orderToPreload.itemId)
 
-      if (!imageCache.has(mockupUrl)) {
-        try {
-          const objectUrl = await fetchGoogleDriveFile(mockupUrl)
+        if (!imageCache.has(url)) {
+          try {
+            const objectUrl = await fetchGoogleDriveFile(url)
 
-          blobUrlsRef.current.add(objectUrl)
-          setImageCache((prev) => new Map(prev).set(mockupUrl, objectUrl))
-          console.log(`[v0] Cached mockup image for order ${orderToPreload.itemId}`)
-        } catch (error) {
-          console.log(`[v0] Failed to cache mockup image for order ${orderToPreload.itemId}:`, error)
+            blobUrlsRef.current.add(objectUrl)
+            setImageCache((prev) => new Map(prev).set(url, objectUrl))
+            console.log(`[v0] Cached ${type} image for order ${orderToPreload.itemId}`)
+          } catch (error) {
+            console.log(`[v0] Failed to cache ${type} image for order ${orderToPreload.itemId}:`, error)
+          }
         }
       }
     },

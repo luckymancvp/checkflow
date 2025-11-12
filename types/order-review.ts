@@ -27,7 +27,7 @@ export interface OrderReviewModalProps {
   isJumpLoading?: boolean // Added loading state for jump to order functionality
 }
 
-export type ViewMode = "tabs" | "stack"
+export type ViewMode = "tabs" | "stack" | "float"
 export type ActiveTab = "product" | "mockup" | "design" | "customer"
 
 export interface OrderHistoryEntry {

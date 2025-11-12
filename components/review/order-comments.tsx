@@ -11,6 +11,8 @@ import { useOrderComments } from "@/hooks/use-order-comments"
 import { formatDistanceToNow } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { uploadImageToS3, extractImageUrls } from "@/lib/s3-upload"
+import { useGlobalPresence } from "@/hooks/use-global-presence"
+import { PresenceAvatars } from "./presence-avatars"
 
 interface OrderCommentsProps {
   itemId: string
@@ -19,6 +21,7 @@ interface OrderCommentsProps {
 export function OrderComments({ itemId }: OrderCommentsProps) {
   const { user } = useAuth()
   const { comments, loading, error, submitting, postComment } = useOrderComments(itemId)
+  const { onlineUsers } = useGlobalPresence(true)
   const [commentText, setCommentText] = useState("")
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -211,25 +214,28 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
     <div className="border-b border-gray-200">
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-2 hover:bg-gray-50 rounded px-2 py-1 -ml-2 transition-colors"
-          >
-            <MessageSquare className="h-4 w-4 text-blue-600" />
-            <h3 className="text-sm font-semibold text-gray-900">Discussion</h3>
-            {loading ? (
-              <span className="text-xs text-gray-400">(Loading...)</span>
-            ) : comments.length > 0 ? (
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{comments.length}</span>
-            ) : (
-              <span className="text-xs text-gray-400">(No comments)</span>
-            )}
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4 text-gray-400" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-gray-400" />
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="flex items-center gap-2 hover:bg-gray-50 rounded px-2 py-1 -ml-2 transition-colors"
+            >
+              <MessageSquare className="h-4 w-4 text-blue-600" />
+              <h3 className="text-sm font-semibold text-gray-900">Discussion</h3>
+              {loading ? (
+                <span className="text-xs text-gray-400">(Loading...)</span>
+              ) : comments.length > 0 ? (
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{comments.length}</span>
+              ) : (
+                <span className="text-xs text-gray-400">(No comments)</span>
+              )}
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-gray-400" />
+              )}
+            </button>
+            <PresenceAvatars users={onlineUsers} label="online" maxDisplay={5} />
+          </div>
           <Button
             variant="ghost"
             size="sm"

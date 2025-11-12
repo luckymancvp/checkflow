@@ -33,6 +33,7 @@ interface CachedSheetHeaders {
 }
 
 const FILTER_STORAGE_KEY = "checkflow_order_filters"
+const BLANK_DESIGNER_VALUE = "[Blank]"
 
 export function useOrderData() {
   const loadFiltersFromStorage = useCallback((): OrderFilters => {
@@ -727,7 +728,19 @@ export function useOrderData() {
 
         // Designer filter
         if (filters.designer && filters.designer.length > 0) {
-          filtered = filtered.filter((order) => order.designer && filters.designer!.includes(order.designer))
+          filtered = filtered.filter((order) => {
+            // Check if filtering for blank designers
+            const hasBlankFilter = filters.designer!.includes(BLANK_DESIGNER_VALUE)
+            const otherDesigners = filters.designer!.filter((d) => d !== BLANK_DESIGNER_VALUE)
+
+            // If order has no designer
+            if (!order.designer || order.designer.trim() === "") {
+              return hasBlankFilter
+            }
+
+            // If order has a designer, check against other filters
+            return otherDesigners.includes(order.designer)
+          })
         }
 
         // Product type filter
@@ -785,9 +798,17 @@ export function useOrderData() {
   const getFilterOptions = useCallback(() => {
     const { orders } = state
 
+    // Get all designers including blank ones
+    const allDesigners = orders.map((o) => o.designer)
+    const hasBlankDesigner = allDesigners.some((d) => !d || d.trim() === "")
+    const nonBlankDesigners = [...new Set(allDesigners.filter((d) => d && d.trim() !== ""))]
+
+    // Add blank designer option if there are orders with no designer
+    const designers = hasBlankDesigner ? [BLANK_DESIGNER_VALUE, ...nonBlankDesigners] : nonBlankDesigners
+
     const options = {
       statuses: [...new Set(orders.map((o) => o.status))],
-      designers: [...new Set(orders.map((o) => o.designer).filter(Boolean))],
+      designers,
       productTypes: [...new Set(orders.map((o) => o.productType).filter(Boolean))],
       stores: [...new Set(orders.map((o) => o.store).filter(Boolean))],
     }

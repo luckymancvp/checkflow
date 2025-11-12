@@ -102,8 +102,17 @@ export default function ReviewPage() {
       if (filters.status && filters.status.length > 0 && !filters.status.includes(order.status)) {
         return false
       }
-      if (filters.designer && filters.designer.length > 0 && !filters.designer.includes(order.designer)) {
-        return false
+      if (filters.designer && filters.designer.length > 0) {
+        const hasBlankFilter = filters.designer.includes("[Blank]")
+        const otherDesigners = filters.designer.filter((d) => d !== "[Blank]")
+
+        const orderHasBlankDesigner = !order.designer || order.designer.trim() === ""
+
+        if (orderHasBlankDesigner) {
+          if (!hasBlankFilter) return false
+        } else {
+          if (!otherDesigners.includes(order.designer)) return false
+        }
       }
       // Skip productType filter when calculating productType counts
       if (filters.store && filters.store.length > 0 && !filters.store.includes(order.store)) {
@@ -135,8 +144,17 @@ export default function ReviewPage() {
       if (filters.status && filters.status.length > 0 && !filters.status.includes(order.status)) {
         return false
       }
-      if (filters.designer && filters.designer.length > 0 && !filters.designer.includes(order.designer)) {
-        return false
+      if (filters.designer && filters.designer.length > 0) {
+        const hasBlankFilter = filters.designer.includes("[Blank]")
+        const otherDesigners = filters.designer.filter((d) => d !== "[Blank]")
+
+        const orderHasBlankDesigner = !order.designer || order.designer.trim() === ""
+
+        if (orderHasBlankDesigner) {
+          if (!hasBlankFilter) return false
+        } else {
+          if (!otherDesigners.includes(order.designer)) return false
+        }
       }
       if (filters.productType && filters.productType.length > 0 && !filters.productType.includes(order.productType)) {
         return false
@@ -163,10 +181,12 @@ export default function ReviewPage() {
       return true
     })
 
-    // Count designers from filtered orders (excluding designer filter)
     ordersForDesignerCount.forEach((order) => {
-      if (order.designer) {
+      if (order.designer && order.designer.trim() !== "") {
         designerCounts[order.designer] = (designerCounts[order.designer] || 0) + 1
+      } else {
+        // Count blank designers with the special marker
+        designerCounts["[Blank]"] = (designerCounts["[Blank]"] || 0) + 1
       }
     })
 

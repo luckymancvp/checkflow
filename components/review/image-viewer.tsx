@@ -8,6 +8,7 @@ import { RotateCw, Camera, ExternalLink } from "lucide-react"
 import type { Order } from "@/types/order"
 import type { ViewMode, ActiveTab } from "@/types/order-review"
 import { getImageUrl } from "@/utils/image-utils"
+import { FloatingImage } from "./floating-image"
 
 interface ImageViewerProps {
   order: Order
@@ -337,6 +338,163 @@ export function ImageViewer({
     )
   }
 
+  const renderImageFloat = () => {
+    const images = [
+      {
+        key: "product" as ActiveTab,
+        label: "Product",
+        src: getImageUrl(order.productImage, "other"),
+        available: !!order.productImage,
+      },
+      {
+        key: "mockup" as ActiveTab,
+        label: "Mockup",
+        src: getCachedImageUrl(getImageUrl(order.mockup, "mockup")),
+        available: !!order.mockup,
+      },
+      {
+        key: "design" as ActiveTab,
+        label: "Design",
+        src: getImageUrl(order.designLink, "design"),
+        available: !!order.designLink,
+      },
+      {
+        key: "customer" as ActiveTab,
+        label: "Customer",
+        src: getImageUrl(order.customerImage, "other"),
+        available: !!order.customerImage,
+      },
+    ]
+
+    return (
+      <div className="space-y-4 h-full flex flex-col">
+        {/* Tab Navigation */}
+        <div className="flex gap-2 border-b border-gray-200 flex-shrink-0">
+          {images.map((img) => (
+            <button
+              key={img.key}
+              onClick={() => setActiveTab(img.key)}
+              disabled={!img.available}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === img.key
+                  ? "border-blue-500 text-blue-600"
+                  : img.available
+                    ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    : "border-transparent text-gray-300 cursor-not-allowed"
+              }`}
+            >
+              {img.label}
+              {!img.available && " (N/A)"}
+            </button>
+          ))}
+        </div>
+
+        <div
+          ref={imageContainerRef}
+          className="relative bg-gray-50 rounded-lg flex-1 flex items-center justify-center min-h-0 overflow-hidden"
+          onMouseDown={handleImageMouseDown}
+          onMouseMove={handleImageMouseMove}
+          onMouseUp={handleImageMouseUp}
+          onMouseLeave={handleImageMouseUp}
+          style={{ cursor: zoom > 100 ? (isDragging ? "grabbing" : "grab") : "default" }}
+        >
+          {(() => {
+            const activeImage = images.find((img) => img.key === activeTab)
+            if (!activeImage?.available || !activeImage.src) {
+              return (
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-2">📷</div>
+                  <p>No {activeImage?.label.toLowerCase()} image available</p>
+                </div>
+              )
+            }
+
+            return (
+              <div className="relative w-full h-full flex items-center justify-center p-2">
+                <div
+                  className="relative max-w-full max-h-full flex items-center justify-center"
+                  style={{
+                    transform: `scale(${zoom / 100}) rotate(${rotation}deg) translate(${panX}px, ${panY}px)`,
+                    transition: isDragging ? "none" : "transform 0.3s ease",
+                  }}
+                >
+                  <LazyImage
+                    key={`${order.itemId}-${activeImage.key}`}
+                    src={activeImage.src}
+                    alt={activeImage.label}
+                    className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
+                    style={{
+                      maxWidth: "90vw",
+                      maxHeight: "80vh",
+                      objectFit: "contain",
+                    }}
+                    fallbackSrc={`/placeholder.svg?height=600&width=800&text=${activeImage.label}`}
+                    draggable={false}
+                  />
+                </div>
+
+                <div className="absolute top-4 right-4 flex gap-2 z-10">
+                  {activeTab === "mockup" && order.mockup && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(order.mockup, "_blank")}
+                      className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
+                      title="Open mockup in new tab"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {activeTab === "design" && order.designLink && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(order.designLink, "_blank")}
+                      className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
+                      title="Open design in new tab"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRotation(rotation + 90)}
+                    className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
+                    title="Rotate image clockwise (R)"
+                  >
+                    <RotateCw className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleScreenshot}
+                    className={`bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200 transition-all duration-300 ${
+                      screenshotTaken ? "bg-green-100 border-green-300 scale-110" : ""
+                    }`}
+                    title="Copy screenshot to clipboard"
+                  >
+                    <Camera
+                      className={`h-4 w-4 transition-colors duration-300 ${screenshotTaken ? "text-green-600" : ""}`}
+                    />
+                  </Button>
+                </div>
+
+                {zoom > 100 && (
+                  <div className="absolute bottom-4 left-4 bg-black/75 text-white text-xs px-2 py-1 rounded">
+                    Drag to pan • Scroll to zoom
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+        </div>
+
+        {order.designLink && <FloatingImage order={order} activeTab="design" getCachedImageUrl={getCachedImageUrl} />}
+      </div>
+    )
+  }
+
   const renderImageStack = () => {
     const images = [
       {
@@ -402,5 +560,5 @@ export function ImageViewer({
     )
   }
 
-  return viewMode === "tabs" ? renderImageTabs() : renderImageStack()
+  return viewMode === "tabs" ? renderImageTabs() : viewMode === "float" ? renderImageFloat() : renderImageStack()
 }

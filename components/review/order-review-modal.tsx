@@ -41,6 +41,9 @@ import { ImageViewer } from "./image-viewer"
 import { KeyboardShortcuts } from "./keyboard-shortcuts"
 import { OrderDetailsPanel } from "./order-details-panel"
 import { STORAGE_KEY, DEFAULT_WIDTHS } from "@/constants/review-modal"
+import { useOrderReviewPresence } from "@/hooks/use-order-review-presence"
+// import { useGlobalPresence } from "@/hooks/use-global-presence"
+import { PresenceAvatars } from "./presence-avatars"
 
 export function OrderReviewModal({
   isOpen,
@@ -59,7 +62,7 @@ export function OrderReviewModal({
   reviewMode,
   isJumpLoading,
 }: OrderReviewModalProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("tabs")
+  const [viewMode, setViewMode] = useState<ViewMode>("float")
   const [activeTab, setActiveTab] = useState<ActiveTab>("mockup")
   const [zoom, setZoom] = useState(100)
   const [orderNote, setOrderNote] = useState("")
@@ -91,6 +94,9 @@ export function OrderReviewModal({
   const prefetchInProgressRef = useRef(false)
 
   const { preloadOrderImages, getCachedImageUrl } = useImageCache()
+
+  const { reviewingUsers, setTypingStatus } = useOrderReviewPresence(order.itemId, isOpen)
+  // const { onlineUsers } = useGlobalPresence(isOpen)
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -200,6 +206,9 @@ export function OrderReviewModal({
     const savedViewMode = localStorage.getItem("orderReviewViewMode") as ViewMode
     if (savedViewMode) {
       setViewMode(savedViewMode)
+    } else {
+      setViewMode("float")
+      localStorage.setItem("orderReviewViewMode", "float")
     }
   }, [])
 
@@ -696,14 +705,38 @@ export function OrderReviewModal({
     fetchSheetGid()
   }, [selectedSheet?.google_sheet_id, selectedSheet?.tab_name])
 
+  const handleOrderNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setOrderNote(e.target.value)
+    setTypingStatus()
+  }
+
+  const hasMultipleReviewers = reviewingUsers.length > 0
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
+      <DialogContent
+        className={`max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0 ${
+          hasMultipleReviewers ? "ring-4 ring-purple-500 ring-opacity-50" : ""
+        }`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white">
+        <div
+          className={`flex items-center justify-between px-4 py-2 border-b border-gray-200 ${
+            hasMultipleReviewers ? "bg-purple-100 border-purple-300" : "bg-white"
+          }`}
+        >
           <div className="flex items-center gap-3">
+            {hasMultipleReviewers && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-purple-600 text-white rounded-md text-xs font-semibold animate-pulse">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Multiple Reviewers Detected</span>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-gray-900">#{order.itemId}</h2>
+              <h2 className={`text-lg font-semibold ${hasMultipleReviewers ? "text-purple-900" : "text-gray-900"}`}>
+                #{order.itemId}
+              </h2>
               <Button variant="ghost" size="sm" onClick={handleCopyItemId} className="h-6 w-6 p-0 hover:bg-gray-100">
                 {copiedItemId ? (
                   <CheckCheck className="h-3 w-3 text-green-600" />
@@ -769,6 +802,8 @@ export function OrderReviewModal({
               </Button>
               {isJumpLoading && <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />}
             </div>
+
+            <PresenceAvatars users={reviewingUsers} label="reviewing" maxDisplay={5} />
           </div>
 
           <div className="flex items-center gap-2">
@@ -913,6 +948,14 @@ export function OrderReviewModal({
                   >
                     Stack
                   </button>
+                  <button
+                    onClick={() => handleViewModeChange("float")}
+                    className={`px-2 py-1 rounded text-xs transition-colors ${
+                      viewMode === "float" ? "bg-blue-100 text-blue-700" : "bg-white text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    Float
+                  </button>
                 </div>
               </div>
 
@@ -950,7 +993,7 @@ export function OrderReviewModal({
                 <Textarea
                   ref={orderNoteTextareaRef}
                   value={orderNote}
-                  onChange={(e) => setOrderNote(e.target.value)}
+                  onChange={handleOrderNoteChange}
                   placeholder="Add or edit order note..."
                   className="min-h-[60px] text-xs bg-white"
                 />
