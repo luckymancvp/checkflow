@@ -23,7 +23,34 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const presenceIdRef = useRef<string | null>(null)
+  const currentItemIdRef = useRef<string>(itemId)
+
+  const cleanupPresence = useCallback(
+    async (targetItemId: string) => {
+      if (!user?.email) return
+
+      const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+      console.log("[v0] Cleaning up presence for:", { user: user.email, itemId: targetItemId })
+
+      try {
+        const { error } = await supabase
+          .from("order_review_presence")
+          .delete()
+          .eq("user_email", user.email)
+          .eq("order_item_id", targetItemId)
+
+        if (error) {
+          console.error("[v0] Error cleaning up presence:", error)
+        } else {
+          console.log("[v0] Successfully cleaned up presence")
+        }
+      } catch (error) {
+        console.error("[v0] Error in cleanupPresence:", error)
+      }
+    },
+    [user],
+  )
 
   // Upsert current user's presence
   const updatePresence = useCallback(
@@ -33,7 +60,7 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
       const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
       try {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("order_review_presence")
           .upsert(
             {
@@ -54,11 +81,6 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
 
         if (error) {
           console.error("[useOrderReviewPresence] Error updating presence:", error)
-          return
-        }
-
-        if (data) {
-          presenceIdRef.current = data.id
         }
       } catch (error) {
         console.error("[useOrderReviewPresence] Error upserting presence:", error)
@@ -101,6 +123,17 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
     }
   }, [itemId, enabled])
 
+  useEffect(() => {
+    const previousItemId = currentItemIdRef.current
+
+    if (previousItemId !== itemId && user?.email) {
+      console.log("[v0] Item changed, cleaning up old presence:", { from: previousItemId, to: itemId })
+      cleanupPresence(previousItemId)
+    }
+
+    currentItemIdRef.current = itemId
+  }, [itemId, user, cleanupPresence])
+
   // Set up real-time subscription
   useEffect(() => {
     if (!enabled || !user) {
@@ -129,15 +162,15 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
             const updatedUser = payload.new as UserPresence
 
             setReviewingUsers((prev) => {
-              const exists = prev.some((u) => u.id === updatedUser.id)
+              const exists = prev.some((u) => u.user_email === updatedUser.user_email)
               if (exists) {
-                return prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
+                return prev.map((u) => (u.user_email === updatedUser.user_email ? updatedUser : u))
               }
               return [...prev, updatedUser]
             })
           } else if (payload.eventType === "DELETE") {
             const deletedUser = payload.old as UserPresence
-            setReviewingUsers((prev) => prev.filter((u) => u.id !== deletedUser.id))
+            setReviewingUsers((prev) => prev.filter((u) => u.user_email !== deletedUser.user_email))
           }
         },
       )
@@ -156,16 +189,10 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
         clearInterval(heartbeatIntervalRef.current)
       }
 
-      const cleanup = async () => {
-        if (presenceIdRef.current) {
-          await supabase.from("order_review_presence").delete().eq("id", presenceIdRef.current)
-        }
-      }
-
-      cleanup()
+      cleanupPresence(itemId)
       supabase.removeChannel(channel)
     }
-  }, [itemId, user, enabled, fetchReviewingUsers, updatePresence])
+  }, [itemId, user, enabled, fetchReviewingUsers, updatePresence, cleanupPresence])
 
   // Update status when user interacts with order note
   const setTypingStatus = useCallback(() => {
