@@ -710,7 +710,7 @@ export function OrderReviewModal({
     setTypingStatus()
   }
 
-  const hasMultipleReviewers = true // Set to true for testing UI
+  const hasMultipleReviewers = reviewingUsers.length > 0
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
