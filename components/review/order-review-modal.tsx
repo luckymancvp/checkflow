@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { LazyImage } from "@/components/ui/lazy-image"
 import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
+import { usePresence } from "@/hooks/use-presence"
+import { PresenceAvatars } from "@/components/review/presence-avatars"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
   X,
@@ -91,6 +93,15 @@ export function OrderReviewModal({
   const prefetchInProgressRef = useRef(false)
 
   const { preloadOrderImages, getCachedImageUrl } = useImageCache()
+
+  const {
+    onlineUsers,
+    reviewingUsers,
+    loading: presenceLoading,
+  } = usePresence({
+    orderItemId: order.itemId,
+    enableTracking: isOpen, // Only track when modal is open
+  })
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -771,6 +782,11 @@ export function OrderReviewModal({
                 Go
               </Button>
               {isJumpLoading && <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />}
+            </div>
+
+            <div className="flex items-center gap-4 ml-4 border-l pl-4 border-gray-200">
+              {reviewingUsers.length > 0 && <PresenceAvatars users={reviewingUsers} maxDisplay={3} label="Reviewing" />}
+              {onlineUsers.length > 0 && <PresenceAvatars users={onlineUsers} maxDisplay={5} label="Online" />}
             </div>
           </div>
 
