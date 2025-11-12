@@ -52,3 +52,19 @@ export function unauthorizedResponse(message: string): NextResponse {
     { status: 401 },
   )
 }
+
+/**
+ * Verifies a JWT token and returns the decoded payload.
+ * @param token The JWT token string.
+ * @returns The decoded user payload or null if invalid.
+ */
+export async function verifyToken(token: string): Promise<AuthenticatedUserPayload | null> {
+  try {
+    const secret = new TextEncoder().encode(APP_JWT_SECRET)
+    const { payload } = await jose.jwtVerify(token, secret)
+    return payload as AuthenticatedUserPayload
+  } catch (error) {
+    logServerError(error as Error, { context: "verifyToken - token verification failed" })
+    return null
+  }
+}
