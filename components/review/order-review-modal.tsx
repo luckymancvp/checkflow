@@ -42,7 +42,7 @@ import { KeyboardShortcuts } from "./keyboard-shortcuts"
 import { OrderDetailsPanel } from "./order-details-panel"
 import { STORAGE_KEY, DEFAULT_WIDTHS } from "@/constants/review-modal"
 import { useOrderReviewPresence } from "@/hooks/use-order-review-presence"
-import { useGlobalPresence } from "@/hooks/use-global-presence"
+// import { useGlobalPresence } from "@/hooks/use-global-presence"
 import { PresenceAvatars } from "./presence-avatars"
 
 export function OrderReviewModal({
@@ -96,7 +96,7 @@ export function OrderReviewModal({
   const { preloadOrderImages, getCachedImageUrl } = useImageCache()
 
   const { reviewingUsers, setTypingStatus } = useOrderReviewPresence(order.itemId, isOpen)
-  const { onlineUsers } = useGlobalPresence(isOpen)
+  // const { onlineUsers } = useGlobalPresence(isOpen)
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -785,8 +785,6 @@ export function OrderReviewModal({
             </div>
 
             <PresenceAvatars users={reviewingUsers} label="reviewing" maxDisplay={5} />
-
-            <PresenceAvatars users={onlineUsers} label="online" maxDisplay={3} />
           </div>
 
           <div className="flex items-center gap-2">

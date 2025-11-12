@@ -148,7 +148,7 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
 
     heartbeatIntervalRef.current = setInterval(() => {
       updatePresence("reviewing")
-    }, 30000)
+    }, 3000)
 
     // Cleanup on unmount
     return () => {

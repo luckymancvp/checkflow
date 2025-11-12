@@ -144,7 +144,7 @@ export function useGlobalPresence(enabled = true) {
 
     heartbeatIntervalRef.current = setInterval(() => {
       updatePresence("online")
-    }, 45000)
+    }, 3000)
 
     // Cleanup on unmount
     return () => {

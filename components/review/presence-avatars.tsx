@@ -1,6 +1,7 @@
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { UserPresence } from "@/hooks/use-order-review-presence"
 import type { GlobalUserPresence } from "@/hooks/use-global-presence"
 
@@ -42,28 +43,43 @@ export function PresenceAvatars({ users, label = "reviewing", maxDisplay = 5 }: 
   }
 
   return (
-    <div className="flex items-center gap-2 ml-4 border-l pl-4 border-gray-200">
-      <div className="flex -space-x-2">
-        {displayUsers.map((user) => (
-          <div key={user.id} title={user.user_name} className="relative">
-            <Avatar className="w-7 h-7 border-2 border-white">
-              <AvatarImage src={user.user_avatar || undefined} alt={user.user_name} />
-              <AvatarFallback className="text-xs bg-blue-100 text-blue-700">
-                {getInitials(user.user_name)}
-              </AvatarFallback>
-            </Avatar>
-            {getStatusIndicator(user)}
-          </div>
-        ))}
-        {remainingCount > 0 && (
-          <div
-            className="relative w-7 h-7 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center"
-            title={`+${remainingCount} more`}
-          >
-            <span className="text-xs font-semibold text-gray-600">+{remainingCount}</span>
-          </div>
-        )}
-      </div>
+    <div className="flex items-center gap-2">
+      <TooltipProvider delayDuration={100}>
+        <div className="flex -space-x-2">
+          {displayUsers.map((user) => (
+            <Tooltip key={user.id}>
+              <TooltipTrigger asChild>
+                <div className="relative cursor-pointer">
+                  <Avatar className="w-7 h-7 border-2 border-white">
+                    <AvatarImage src={user.user_avatar || undefined} alt={user.user_name} />
+                    <AvatarFallback className="text-xs bg-blue-100 text-blue-700">
+                      {getInitials(user.user_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {getStatusIndicator(user)}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                <p>{user.user_name}</p>
+              </TooltipContent>
+            </Tooltip>
+          ))}
+          {remainingCount > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative w-7 h-7 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center cursor-pointer">
+                  <span className="text-xs font-semibold text-gray-600">+{remainingCount}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                <p>
+                  +{remainingCount} more {label}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      </TooltipProvider>
       <span className="text-xs text-gray-500">
         {users.length} {label}
       </span>
