@@ -710,14 +710,33 @@ export function OrderReviewModal({
     setTypingStatus()
   }
 
+  const hasMultipleReviewers = true // Set to true for testing UI
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0">
+      <DialogContent
+        className={`max-w-none max-h-none w-screen h-screen overflow-hidden p-0 m-0 ${
+          hasMultipleReviewers ? "ring-4 ring-purple-500 ring-opacity-50" : ""
+        }`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white">
+        <div
+          className={`flex items-center justify-between px-4 py-2 border-b border-gray-200 ${
+            hasMultipleReviewers ? "bg-purple-100 border-purple-300" : "bg-white"
+          }`}
+        >
           <div className="flex items-center gap-3">
+            {hasMultipleReviewers && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-purple-600 text-white rounded-md text-xs font-semibold animate-pulse">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Multiple Reviewers Detected</span>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-gray-900">#{order.itemId}</h2>
+              <h2 className={`text-lg font-semibold ${hasMultipleReviewers ? "text-purple-900" : "text-gray-900"}`}>
+                #{order.itemId}
+              </h2>
               <Button variant="ghost" size="sm" onClick={handleCopyItemId} className="h-6 w-6 p-0 hover:bg-gray-100">
                 {copiedItemId ? (
                   <CheckCheck className="h-3 w-3 text-green-600" />
