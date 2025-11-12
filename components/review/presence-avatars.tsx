@@ -42,8 +42,6 @@ export function PresenceAvatars({ users, label = "reviewing", maxDisplay = 5 }: 
     return null
   }
 
-  const allUserNames = users.map((u) => u.user_name).join(", ")
-
   return (
     <div className="flex items-center gap-2">
       <TooltipProvider delayDuration={100}>
@@ -73,12 +71,9 @@ export function PresenceAvatars({ users, label = "reviewing", maxDisplay = 5 }: 
                   <span className="text-xs font-semibold text-gray-600">+{remainingCount}</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs max-w-xs">
-                <p className="whitespace-pre-wrap">
-                  {users
-                    .slice(maxDisplay)
-                    .map((u) => u.user_name)
-                    .join(", ")}
+              <TooltipContent side="bottom" className="text-xs">
+                <p>
+                  +{remainingCount} more {label}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -92,13 +87,18 @@ export function PresenceAvatars({ users, label = "reviewing", maxDisplay = 5 }: 
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs max-w-xs">
             <div className="space-y-1">
-              <p className="font-semibold">
+              <p className="font-semibold mb-1">
                 {users.length} {label}:
               </p>
-              <p className="whitespace-pre-wrap">{allUserNames}</p>
+              {users.map((user) => (
+                <p key={user.id} className="text-gray-600">
+                  • {user.user_name}
+                </p>
+              ))}
             </div>
           </TooltipContent>
         </Tooltip>
+        {/* </CHANGE> */}
       </TooltipProvider>
     </div>
   )
