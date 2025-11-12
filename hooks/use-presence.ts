@@ -21,8 +21,8 @@ export interface UserPresence {
 }
 
 interface UsePresenceOptions {
-  orderItemId?: string | null // Track which order item the user is viewing
-  enableTracking?: boolean // Enable/disable presence tracking
+  orderItemId?: string | null
+  enableTracking?: boolean
 }
 
 export function usePresence(options: UsePresenceOptions = {}) {
@@ -34,113 +34,140 @@ export function usePresence(options: UsePresenceOptions = {}) {
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
+  console.log("[v0] usePresence initialized", {
+    userId: user?.id,
+    orderItemId,
+    enableTracking,
+    hasSupabaseUrl: !!supabaseUrl,
+    hasSupabaseKey: !!supabaseAnonKey,
+  })
+
   // Initialize Supabase client
   useEffect(() => {
     if (!supabaseRef.current) {
       supabaseRef.current = createClient(supabaseUrl, supabaseAnonKey)
+      console.log("[v0] Supabase client created for presence")
     }
   }, [])
 
-  // Upsert presence
   const upsertPresence = useCallback(async () => {
-    if (!user || !enableTracking || !supabaseRef.current) return
+    if (!user || !enableTracking || !supabaseRef.current) {
+      console.log("[v0] Skipping presence upsert", {
+        hasUser: !!user,
+        enableTracking,
+        hasClient: !!supabaseRef.current,
+      })
+      return
+    }
 
     try {
-      const { error } = await supabaseRef.current.from("user_presence").upsert(
-        {
-          user_id: user.id,
-          user_name: user.name,
-          user_avatar: user.avatar_url || null,
-          user_email: user.email,
-          order_item_id: orderItemId,
-          last_seen: new Date().toISOString(),
-          status: "online",
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "user_id",
-        },
-      )
+      const presenceData = {
+        user_id: user.id,
+        user_name: user.name,
+        user_avatar: user.avatar_url || null,
+        user_email: user.email,
+        order_item_id: orderItemId,
+        last_seen: new Date().toISOString(),
+        status: "online" as const,
+        updated_at: new Date().toISOString(),
+      }
+
+      console.log("[v0] Upserting presence", presenceData)
+
+      const { error } = await supabaseRef.current.from("user_presence").upsert(presenceData, {
+        onConflict: "user_id",
+      })
 
       if (error) {
-        console.error("[usePresence] Error upserting presence:", error)
+        console.error("[v0] Error upserting presence:", error)
+      } else {
+        console.log("[v0] Presence upserted successfully")
       }
     } catch (err) {
-      console.error("[usePresence] Failed to upsert presence:", err)
+      console.error("[v0] Failed to upsert presence:", err)
     }
   }, [user, orderItemId, enableTracking])
 
-  // Remove presence on unmount or when tracking is disabled
   const removePresence = useCallback(async () => {
     if (!user || !supabaseRef.current) return
 
     try {
+      console.log("[v0] Removing presence for user", user.id)
       const { error } = await supabaseRef.current.from("user_presence").delete().eq("user_id", user.id)
 
       if (error) {
-        console.error("[usePresence] Error removing presence:", error)
+        console.error("[v0] Error removing presence:", error)
+      } else {
+        console.log("[v0] Presence removed successfully")
       }
     } catch (err) {
-      console.error("[usePresence] Failed to remove presence:", err)
+      console.error("[v0] Failed to remove presence:", err)
     }
   }, [user])
 
-  // Fetch all presence data
   const fetchPresence = useCallback(async () => {
-    if (!supabaseRef.current) return
+    if (!supabaseRef.current) {
+      console.log("[v0] No Supabase client, skipping presence fetch")
+      return
+    }
 
     try {
       setLoading(true)
+      console.log("[v0] Fetching presence data")
+
       const { data, error } = await supabaseRef.current
         .from("user_presence")
         .select("*")
         .eq("status", "online")
-        .gte("last_seen", new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+        .gte("last_seen", new Date(Date.now() - 5 * 60 * 1000).toISOString())
 
       if (error) {
-        console.error("[usePresence] Error fetching presence:", error)
+        console.error("[v0] Error fetching presence:", error)
         return
       }
+
+      console.log("[v0] Fetched presence data", { count: data?.length, data })
 
       if (data) {
         setOnlineUsers(data as UserPresence[])
 
-        // Filter users reviewing the current order item
         if (orderItemId) {
           const reviewing = data.filter(
             (p) => p.order_item_id === orderItemId && p.user_id !== user?.id,
           ) as UserPresence[]
+          console.log("[v0] Reviewing users for order", { orderItemId, count: reviewing.length, reviewing })
           setReviewingUsers(reviewing)
         }
       }
     } catch (err) {
-      console.error("[usePresence] Failed to fetch presence:", err)
+      console.error("[v0] Failed to fetch presence:", err)
     } finally {
       setLoading(false)
     }
   }, [orderItemId, user?.id])
 
-  // Set up real-time subscription and heartbeat
   useEffect(() => {
     if (!user || !enableTracking || !supabaseRef.current) {
+      console.log("[v0] Presence tracking not enabled", {
+        hasUser: !!user,
+        enableTracking,
+        hasClient: !!supabaseRef.current,
+      })
       setLoading(false)
       return
     }
 
+    console.log("[v0] Setting up presence tracking for user", user.id)
     const supabase = supabaseRef.current
 
-    // Initial presence upsert
     upsertPresence()
-
-    // Fetch initial presence data
     fetchPresence()
 
-    // Set up heartbeat to update presence every 30 seconds
     heartbeatIntervalRef.current = setInterval(() => {
+      console.log("[v0] Presence heartbeat")
       upsertPresence()
     }, 30000)
 
-    // Subscribe to presence changes
     const channel = supabase
       .channel("user-presence-realtime")
       .on(
@@ -151,25 +178,26 @@ export function usePresence(options: UsePresenceOptions = {}) {
           table: "user_presence",
         },
         (payload) => {
-          console.log("[usePresence] Real-time update:", payload)
+          console.log("[v0] Presence real-time update:", payload)
 
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const presence = payload.new as UserPresence
 
-            // Update online users
             setOnlineUsers((prev) => {
               const filtered = prev.filter((p) => p.user_id !== presence.user_id)
-              return [...filtered, presence]
+              const updated = [...filtered, presence]
+              console.log("[v0] Updated online users", { count: updated.length })
+              return updated
             })
 
-            // Update reviewing users if they're on the same order
             if (orderItemId && presence.order_item_id === orderItemId && presence.user_id !== user.id) {
               setReviewingUsers((prev) => {
                 const filtered = prev.filter((p) => p.user_id !== presence.user_id)
-                return [...filtered, presence]
+                const updated = [...filtered, presence]
+                console.log("[v0] Updated reviewing users", { count: updated.length })
+                return updated
               })
             } else if (orderItemId) {
-              // Remove user from reviewing list if they switched to a different order
               setReviewingUsers((prev) => prev.filter((p) => p.user_id !== presence.user_id))
             }
           } else if (payload.eventType === "DELETE") {
@@ -180,10 +208,12 @@ export function usePresence(options: UsePresenceOptions = {}) {
           }
         },
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log("[v0] Presence channel status:", status)
+      })
 
-    // Cleanup on unmount
     return () => {
+      console.log("[v0] Cleaning up presence tracking")
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current)
       }
@@ -192,15 +222,15 @@ export function usePresence(options: UsePresenceOptions = {}) {
     }
   }, [user, orderItemId, enableTracking, upsertPresence, fetchPresence, removePresence])
 
-  // Update presence when orderItemId changes
   useEffect(() => {
     if (user && enableTracking) {
+      console.log("[v0] Order item changed, updating presence", orderItemId)
       upsertPresence()
     }
   }, [orderItemId, user, enableTracking, upsertPresence])
 
   return {
-    onlineUsers: onlineUsers.filter((p) => p.user_id !== user?.id), // Exclude current user
+    onlineUsers: onlineUsers.filter((p) => p.user_id !== user?.id),
     reviewingUsers,
     loading,
     refresh: fetchPresence,
