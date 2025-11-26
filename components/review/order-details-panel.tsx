@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { LazyImage } from "@/components/ui/lazy-image"
-import { ExternalLink, FileText, Clock, User, History, Edit2, Check, X, Lightbulb } from "lucide-react"
+import { ExternalLink, FileText, Clock, User, History, Edit2, Check, X, Lightbulb } from 'lucide-react'
 import type { Order } from "@/types/order"
 import type {
   OrderHistoryResponse,
@@ -231,7 +231,7 @@ export function OrderDetailsPanel({
               <span className="font-medium">{getStatusBadge(currentStatus)}</span>
             </div>
             <div>
-              <span className="text-gray-600">Store:</span>{" "}
+              <span className="text-gray-600">{order.store ? "Store" : "Product"}:</span>{" "}
               {order.store ? (
                 <a
                   href={`https://www.etsy.com/shop/${order.store}?search_query=${encodeURIComponent(order.productName || "")}`}
@@ -243,7 +243,7 @@ export function OrderDetailsPanel({
                   <ExternalLink className="h-3 w-3" />
                 </a>
               ) : (
-                <span className="font-medium">N/A</span>
+                <span className="font-medium">{order.productName || "N/A"}</span>
               )}
             </div>
           </div>

@@ -996,6 +996,7 @@ export function OrderReviewModal({
                   onChange={handleOrderNoteChange}
                   placeholder="Add or edit order note..."
                   className="min-h-[60px] text-xs bg-white"
+                  disabled={true}
                 />
                 {showOrderNoteImages && extractImageUrls(orderNote).length > 0 && (
                   <div className="mt-2 space-y-2">
