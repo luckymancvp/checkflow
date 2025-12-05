@@ -84,6 +84,7 @@ export function OrderReviewModal({
   const [startX, setStartX] = useState(0)
   const [startWidths, setStartWidths] = useState(DEFAULT_WIDTHS)
   const [showOrderNoteImages, setShowOrderNoteImages] = useState(false)
+  const [showCustomerImages, setShowCustomerImages] = useState(true)
   const [jumpItemId, setJumpItemId] = useState("")
   const [jumpError, setJumpError] = useState("")
   const [showChangesNotification, setShowChangesNotification] = useState(false)
@@ -1047,16 +1048,49 @@ export function OrderReviewModal({
               {/* Customer Image */}
               {order.customerImage && (
                 <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                  <h3 className="text-xs font-semibold text-green-900 mb-2">3. Customer Image</h3>
-                  <div className="w-full">
-                    <LazyImage
-                      src={getCachedImageUrl(order.customerImage) || order.customerImage}
-                      alt="Customer Reference"
-                      className="w-full h-auto object-contain rounded border border-green-200 cursor-pointer"
-                      onClick={() => window.open(order.customerImage, "_blank")}
-                      fallbackSrc="/placeholder.svg?height=200&width=200&text=Customer+Image"
-                    />
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-green-900">3. Customer Image</h3>
+                    {extractImageUrls(order.customerImage).length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowCustomerImages(!showCustomerImages)}
+                        className="h-5 w-5 p-0 hover:bg-green-100"
+                        title={showCustomerImages ? "Hide images" : "Show images"}
+                      >
+                        {showCustomerImages ? (
+                          <EyeOff className="h-3 w-3 text-green-700" />
+                        ) : (
+                          <Eye className="h-3 w-3 text-green-700" />
+                        )}
+                      </Button>
+                    )}
                   </div>
+                  {showCustomerImages && (
+                    <div className="w-full space-y-2">
+                      {extractImageUrls(order.customerImage).length > 0 ? (
+                        extractImageUrls(order.customerImage).map((url, index) => (
+                          <div key={index} className="relative">
+                            <LazyImage
+                              src={getCachedImageUrl(url) || url}
+                              alt={`Customer Image ${index + 1}`}
+                              className="w-full h-auto object-contain rounded border border-green-200 cursor-pointer"
+                              onClick={() => window.open(url, "_blank")}
+                              fallbackSrc="/placeholder.svg?height=200&width=200&text=Customer+Image"
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <LazyImage
+                          src={getCachedImageUrl(order.customerImage) || order.customerImage}
+                          alt="Customer Reference"
+                          className="w-full h-auto object-contain rounded border border-green-200 cursor-pointer"
+                          onClick={() => window.open(order.customerImage, "_blank")}
+                          fallbackSrc="/placeholder.svg?height=200&width=200&text=Customer+Image"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

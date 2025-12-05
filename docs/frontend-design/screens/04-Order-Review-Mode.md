@@ -173,11 +173,11 @@ When users change order status in the review mode, the synchronization to Google
 ### Sync Status Indicators
 
 #### Visual Feedback
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────────┐
 │ Order #12345 - Review Mode | ⚡ Syncing... | [✕]        │
 └─────────────────────────────────────────────────────────┘
-```
+\`\`\`
 
 #### Status States
 - **⚡ Syncing...**: During active synchronization
@@ -186,7 +186,7 @@ When users change order status in the review mode, the synchronization to Google
 - **⏳ Pending**: Changes made but not yet synced (during 5s idle period or awaiting task completion)
 
 ### Unsaved Changes Modal
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────────┐
 │ Unsaved Changes                                 [✕]     │
 ├─────────────────────────────────────────────────────────┤
@@ -199,7 +199,7 @@ When users change order status in the review mode, the synchronization to Google
 │                                                         │
 │ [Save and Close] [Close Without Saving] [Cancel]       │
 └─────────────────────────────────────────────────────────┘
-```
+\`\`\`
 
 #### Modal Behavior
 - **Appears**: Only when closing tab/browser with unsaved changes within 5s
@@ -553,7 +553,7 @@ Entered via "Check" button on specific order.
 ## Mobile Responsiveness
 
 ### Mobile Screen Layout
-```
+\`\`\`
 ┌─────────────────────┐
 │ Order #12345    [✕] │
 │ Order 12/45 | T-Shirt [📋] │
@@ -592,7 +592,7 @@ Entered via "Check" button on specific order.
 │ (All orders shown)  │
 │ [Add Note]          │
 └─────────────────────┘
-```
+\`\`\`
 
 ### Mobile Optimizations
 - **Compact Header**: Product history button accessible

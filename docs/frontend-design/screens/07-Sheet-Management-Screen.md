@@ -337,7 +337,7 @@ Configure and manage the system-wide Google Sheets integration, including detail
 ### Data Structure Sample
 When configuring sheets, users will see preview data like:
 
-```
+\`\`\`
 Item ID: DAV-3743324273-4669119845
 Status: DESIGNED
 Order Note: Can I change the ability to 'Friend to Lovers' | Customer Note and Support Note write here
@@ -350,7 +350,7 @@ Store: VintageVibesStoreVN
 Image: https://i.etsystatic.com/54076614/r/il/05d327/6967622997/il_300x300.6967622997_ifmf.jpg
 Product Type: pokemon-anniversary-card
 Product Name: Personalized Pokemon Anniversary Card, Custom Photo Anime Wedding Card, Anniversary Gift, Gift for Him, Gift for Her, Custom Card for Couple
-```
+\`\`\`
 
 ## Component Details
 
