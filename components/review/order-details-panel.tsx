@@ -4,8 +4,9 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { LazyImage } from "@/components/ui/lazy-image"
-import { ExternalLink, FileText, Clock, User, History, Edit2, Check, X, Lightbulb } from 'lucide-react'
+import { ExternalLink, FileText, Clock, User, History, Edit2, Check, X, Lightbulb, LinkIcon } from "lucide-react"
 import type { Order } from "@/types/order"
 import type {
   OrderHistoryResponse,
@@ -31,6 +32,7 @@ interface OrderDetailsPanelProps {
   productTypeNoteError: string | null
   refetchProductTypeNote: () => void
   getCachedImageUrl: (url: string | null) => string | null
+  onOrderUpdate?: () => void
 }
 
 export function OrderDetailsPanel({
@@ -47,10 +49,16 @@ export function OrderDetailsPanel({
   productTypeNoteError,
   refetchProductTypeNote,
   getCachedImageUrl,
+  onOrderUpdate,
 }: OrderDetailsPanelProps) {
   const [productTypeNote, setProductTypeNote] = useState("")
   const [isEditingProductNote, setIsEditingProductNote] = useState(false)
   const [productNoteLoading, setProductNoteLoading] = useState(false)
+
+  const [mockupLink, setMockupLink] = useState("")
+  const [designLink, setDesignLink] = useState("")
+  const [isEditingLinks, setIsEditingLinks] = useState(false)
+  const [linksLoading, setLinksLoading] = useState(false)
 
   useEffect(() => {
     if (productTypeNoteData?.data?.content) {
@@ -59,6 +67,11 @@ export function OrderDetailsPanel({
       setProductTypeNote("")
     }
   }, [productTypeNoteData])
+
+  useEffect(() => {
+    setMockupLink(order.mockup || "")
+    setDesignLink(order.designLink || "")
+  }, [order.mockup, order.designLink])
 
   const scrollToProductHistory = () => {
     const element = document.getElementById("product-history-section")
@@ -124,7 +137,6 @@ export function OrderDetailsPanel({
   const renderNoteContent = (content: string) => {
     if (!content) return null
 
-    // Split content by URLs and render text and images
     const urlRegex = /(https?:\/\/[^\s]+)/g
     const parts = content.split(urlRegex)
 
@@ -132,7 +144,6 @@ export function OrderDetailsPanel({
       <div className="space-y-2">
         {parts.map((part, index) => {
           if (urlRegex.test(part)) {
-            // Check if it's an image URL
             const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(part)
             if (isImage) {
               return (
@@ -147,7 +158,6 @@ export function OrderDetailsPanel({
                 </div>
               )
             } else {
-              // Regular URL - render as link
               return (
                 <a
                   key={index}
@@ -161,7 +171,6 @@ export function OrderDetailsPanel({
               )
             }
           } else {
-            // Regular text
             return part ? (
               <p key={index} className="text-xs text-gray-700 whitespace-pre-wrap">
                 {part}
@@ -206,6 +215,55 @@ export function OrderDetailsPanel({
     setIsEditingProductNote(false)
   }
 
+  const handleSaveLinks = async () => {
+    setLinksLoading(true)
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          itemId: order.itemId,
+          googleSheetId: order.sheetId,
+          status: order.status,
+          orderNote: order.orderNote,
+          designer: order.designer,
+          designLink: designLink || undefined,
+          mockup: mockupLink || undefined,
+          customerImage: order.customerImage,
+          personalization: order.personalization,
+          date: order.date,
+          store: order.store,
+          productImage: order.productImage,
+          productType: order.productType,
+          productName: order.productName,
+          changeType:
+            order.status === "NEED_REPAIR" ? (order._changes ? "design_error" : "customer_change") : undefined,
+        }),
+      })
+
+      if (response.ok) {
+        setIsEditingLinks(false)
+        if (onOrderUpdate) {
+          onOrderUpdate()
+        }
+      } else {
+        console.error("Failed to update mockup and design links")
+      }
+    } catch (error) {
+      console.error("Error updating links:", error)
+    } finally {
+      setLinksLoading(false)
+    }
+  }
+
+  const handleCancelEditLinks = () => {
+    setMockupLink(order.mockup || "")
+    setDesignLink(order.designLink || "")
+    setIsEditingLinks(false)
+  }
+
   return (
     <>
       {/* Order Comments */}
@@ -247,6 +305,114 @@ export function OrderDetailsPanel({
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Mockup & Design Links */}
+      <div className="border-b border-gray-200">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <LinkIcon className="h-4 w-4 text-blue-600" />
+              <h3 className="text-sm font-semibold text-gray-900">Mockup & Design Links</h3>
+            </div>
+            {!isEditingLinks ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditingLinks(true)}
+                className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                title="Edit mockup and design links"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+            ) : (
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSaveLinks}
+                  disabled={linksLoading}
+                  className="h-7 w-7 p-0 text-green-600 hover:bg-green-50 hover:text-green-700"
+                  title="Save links"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelEditLinks}
+                  disabled={linksLoading}
+                  className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  title="Cancel"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {isEditingLinks ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1 block">Mockup Link</label>
+                <Input
+                  value={mockupLink}
+                  onChange={(e) => setMockupLink(e.target.value)}
+                  placeholder="Enter mockup image URL..."
+                  className="text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1 block">Design Link</label>
+                <Input
+                  value={designLink}
+                  onChange={(e) => setDesignLink(e.target.value)}
+                  placeholder="Enter design file URL..."
+                  className="text-xs"
+                />
+              </div>
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <Lightbulb className="h-3 w-3" />
+                <span>Tip: Paste full URLs to images or design files</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs font-medium text-gray-700 mb-1">Mockup</div>
+                {order.mockup ? (
+                  <a
+                    href={order.mockup}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 break-all"
+                  >
+                    {order.mockup}
+                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-500 italic">No mockup link</span>
+                )}
+              </div>
+              <div>
+                <div className="text-xs font-medium text-gray-700 mb-1">Design</div>
+                {order.designLink ? (
+                  <a
+                    href={order.designLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 break-all"
+                  >
+                    {order.designLink}
+                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-500 italic">No design link</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
