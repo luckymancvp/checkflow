@@ -1,11 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+import { getAblyBrowserClient } from "@/lib/ably-browser-client"
+import type Ably from "ably"
 
 export interface GlobalUserPresence {
   id: string
@@ -21,150 +19,119 @@ export function useGlobalPresence(enabled = true) {
   const [onlineUsers, setOnlineUsers] = useState<GlobalUserPresence[]>([])
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const presenceIdRef = useRef<string | null>(null)
 
-  // Upsert current user's global presence
   const updatePresence = useCallback(
     async (status: "online" | "idle" = "online") => {
       if (!user || !enabled) return
 
-      const supabase = createClient(supabaseUrl, supabaseAnonKey)
+      const ably = getAblyBrowserClient()
+      const channel = ably.channels.get("global-user-presence")
 
       try {
-        const { data, error } = await supabase
-          .from("global_user_presence")
-          .upsert(
-            {
-              user_id: user.id || user.email,
-              user_email: user.email,
-              user_name: user.name,
-              user_avatar: user.avatar_url || null,
-              status,
-              last_activity: new Date().toISOString(),
-            },
-            {
-              onConflict: "user_email",
-            },
-          )
-          .select()
-          .single()
-
-        if (error) {
-          console.error("[useGlobalPresence] Error updating presence:", error)
-          return
-        }
-
-        if (data) {
-          presenceIdRef.current = data.id
-        }
+        await channel.presence.update({
+          user_id: user.id || user.email,
+          user_email: user.email,
+          user_name: user.name,
+          user_avatar: user.avatar_url || null,
+          status,
+          last_activity: new Date().toISOString(),
+        })
       } catch (error) {
-        console.error("[useGlobalPresence] Error upserting presence:", error)
+        console.error("[useGlobalPresence] Error updating presence:", error)
       }
     },
     [user, enabled],
   )
 
-  // Fetch initial online users
-  const fetchOnlineUsers = useCallback(async () => {
-    if (!enabled) {
-      setLoading(false)
-      return
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-    try {
-      setLoading(true)
-      // Consider users online if they updated within last 2 minutes
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
-
-      const { data, error } = await supabase
-        .from("global_user_presence")
-        .select("*")
-        .gt("updated_at", twoMinutesAgo)
-        .order("last_activity", { ascending: false })
-
-      if (error) {
-        console.error("[useGlobalPresence] Error fetching users:", error)
-        return
-      }
-
-      setOnlineUsers(data || [])
-    } catch (error) {
-      console.error("[useGlobalPresence] Error fetching online users:", error)
-    } finally {
-      setLoading(false)
-    }
-  }, [enabled])
-
-  // Set up real-time subscription for global presence
   useEffect(() => {
     if (!enabled || !user) {
       setLoading(false)
       return
     }
 
-    fetchOnlineUsers()
+    const ably = getAblyBrowserClient()
+    const channel = ably.channels.get("global-user-presence")
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-    const channel = supabase
-      .channel("global-user-presence")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "global_user_presence",
-        },
-        (payload) => {
-          console.log("[v0] Global presence update:", payload)
-
-          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-            const updatedUser = payload.new as GlobalUserPresence
-
-            setOnlineUsers((prev) => {
-              const exists = prev.some((u) => u.id === updatedUser.id)
-              if (exists) {
-                return prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
-              }
-              return [...prev, updatedUser]
-            })
-          } else if (payload.eventType === "DELETE") {
-            const deletedUser = payload.old as GlobalUserPresence
-            setOnlineUsers((prev) => prev.filter((u) => u.id !== deletedUser.id))
-          }
-        },
-      )
-      .subscribe()
-
-    // Update presence immediately
-    updatePresence("online")
-
-    heartbeatIntervalRef.current = setInterval(() => {
-      updatePresence("online")
-    }, 3000)
-
-    // Cleanup on unmount
-    return () => {
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current)
+    const enterPresence = async () => {
+      try {
+        await channel.presence.enter({
+          user_id: user.id || user.email,
+          user_email: user.email,
+          user_name: user.name,
+          user_avatar: user.avatar_url || null,
+          status: "online",
+          last_activity: new Date().toISOString(),
+        })
+      } catch (error) {
+        console.error("[useGlobalPresence] Error entering presence:", error)
       }
-
-      const cleanup = async () => {
-        if (presenceIdRef.current) {
-          await supabase.from("global_user_presence").delete().eq("id", presenceIdRef.current)
-        }
-      }
-
-      cleanup()
-      supabase.removeChannel(channel)
     }
-  }, [user, enabled, fetchOnlineUsers, updatePresence])
+
+    const handlePresenceUpdate = (member: Ably.PresenceMessage) => {
+      const presenceData = member.data as Omit<GlobalUserPresence, "id">
+
+      setOnlineUsers((prev) => {
+        // Filter out current user
+        if (presenceData.user_email === user.email) {
+          return prev
+        }
+
+        const exists = prev.some((u) => u.user_email === presenceData.user_email)
+
+        if (member.action === "enter" || member.action === "update") {
+          const userData: GlobalUserPresence = {
+            id: member.clientId || presenceData.user_email,
+            ...presenceData,
+          }
+
+          if (exists) {
+            return prev.map((u) => (u.user_email === presenceData.user_email ? userData : u))
+          }
+          return [...prev, userData]
+        } else if (member.action === "leave") {
+          return prev.filter((u) => u.user_email !== presenceData.user_email)
+        }
+
+        return prev
+      })
+    }
+
+    channel.presence.subscribe(handlePresenceUpdate)
+
+    channel.presence.get((err, members) => {
+      if (err) {
+        console.error("[useGlobalPresence] Error getting presence:", err)
+        setLoading(false)
+        return
+      }
+
+      const initialUsers: GlobalUserPresence[] =
+        members
+          ?.filter((m) => m.data?.user_email !== user.email)
+          .map((m) => ({
+            id: m.clientId || m.data.user_email,
+            user_id: m.data.user_id,
+            user_email: m.data.user_email,
+            user_name: m.data.user_name,
+            user_avatar: m.data.user_avatar || null,
+            status: m.data.status || "online",
+            last_activity: m.data.last_activity || new Date().toISOString(),
+          })) || []
+
+      setOnlineUsers(initialUsers)
+      setLoading(false)
+    })
+
+    enterPresence()
+
+    return () => {
+      channel.presence.leave()
+      channel.presence.unsubscribe(handlePresenceUpdate)
+    }
+  }, [user, enabled])
 
   return {
-    onlineUsers: onlineUsers.filter((u) => u.user_email !== user?.email), // Exclude current user
+    onlineUsers,
     loading,
     updatePresence,
   }
