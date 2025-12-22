@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, unauthorizedResponse } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase"
 import { logServerError, logServerInfo } from "@/lib/server-sentry"
+import { publishToChannel } from "@/lib/ably-client"
 
 // GET - Fetch all comments for an order item
 export async function GET(request: NextRequest, { params }: { params: { itemId: string } }) {
@@ -101,6 +102,17 @@ export async function POST(request: NextRequest, { params }: { params: { itemId:
         },
         { status: 500 },
       )
+    }
+
+    try {
+      await publishToChannel(`order-comments:${itemId}`, "comment:new", comment)
+    } catch (ablyError) {
+      // Log error but don't fail the request
+      logServerError(ablyError as Error, {
+        context: "POST /api/comments/[itemId] - Ably publish",
+        userId: appUser.sub,
+        itemId,
+      })
     }
 
     logServerInfo("Comment created successfully", {
