@@ -3,11 +3,11 @@ import { authenticateRequest, unauthorizedResponse } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase"
 import { logServerError, logServerInfo } from "@/lib/server-sentry"
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const appUser = await authenticateRequest(request)
     const supabase = createServerClient()
-    const sheetId = params.id
+    const { id: sheetId } = await params
     const body = await request.json()
 
     const { name, description, googleSheetId, tabName, configuration } = body
@@ -106,11 +106,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const appUser = await authenticateRequest(request)
     const supabase = createServerClient()
-    const sheetId = params.id
+    const { id: sheetId } = await params
 
     // Fetch existing sheet to check existence
     const { data: existingSheet, error: fetchError } = await supabase

@@ -27,6 +27,7 @@ export interface Sheet {
       image: string
       productType: string
       productName: string
+      country: string
     }
     readDirection: string
     maxRowsPerLoad: number

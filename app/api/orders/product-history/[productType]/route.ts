@@ -3,11 +3,11 @@ import { authenticateRequest, unauthorizedResponse } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase"
 import { logServerError, logServerInfo } from "@/lib/server-sentry"
 
-export async function GET(request: NextRequest, { params }: { params: { productType: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ productType: string }> }) {
   try {
     const appUser = await authenticateRequest(request)
     const supabase = createServerClient()
-    const productType = params.productType
+    const { productType } = await params
     const { searchParams } = new URL(request.url)
     const googleSheetId = searchParams.get("google_sheet_id")
 

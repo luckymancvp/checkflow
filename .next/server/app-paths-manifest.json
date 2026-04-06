@@ -1,0 +1,8 @@
+{
+  "/api/orders/product-history/[productType]/route": "app/api/orders/product-history/[productType]/route.js",
+  "/api/orders/[id]/history/route": "app/api/orders/[id]/history/route.js",
+  "/api/comments/[itemId]/route": "app/api/comments/[itemId]/route.js",
+  "/api/product-type-notes/[productType]/route": "app/api/product-type-notes/[productType]/route.js",
+  "/review/page": "app/review/page.js",
+  "/sheets/page": "app/sheets/page.js"
+}
