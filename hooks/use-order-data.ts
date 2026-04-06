@@ -384,9 +384,6 @@ export function useOrderData() {
         const getColumnValue = (fieldName: string): string => {
           const columnHeader = columnMapping[fieldName]
           if (!columnHeader) {
-            if (fieldName === "mockup") {
-              console.log(`[DEBUG] No column mapping for mockup field`)
-            }
             return ""
           }
 
@@ -394,24 +391,14 @@ export function useOrderData() {
           const columnIndex = headers.findIndex((header) => header === columnHeader)
 
           if (columnIndex === -1) {
-            if (fieldName === "mockup") {
-              console.log(`[DEBUG] Mockup column '${columnHeader}' not found in headers:`, headers)
-            }
             return ""
           }
 
           if (columnIndex >= row.length) {
-            if (fieldName === "mockup") {
-              console.log(`[DEBUG] Mockup column index ${columnIndex} >= row length ${row.length}`)
-              console.log(`[DEBUG] Row data:`, row)
-            }
             return ""
           }
 
           const value = row[columnIndex]?.toString().trim() || ""
-          if (fieldName === "mockup" && value) {
-            console.log(`[DEBUG] Found mockup value at index ${columnIndex}:`, value)
-          }
           return value
         }
 
@@ -475,8 +462,37 @@ export function useOrderData() {
         const { columnMapping, dataRange } = configuration
 
         const headerRow = dataRange.headerRow || 1
-        const columns = dataRange.columns || "A:Z"
-        const [startCol, endCol] = columns.split(":")
+
+        // Step 1: Load header row first to detect number of columns
+        const headerRange = `${sheet.tab_name}!${headerRow}:${headerRow}`
+        const headerResponse = await googleSheetsClient.getSheetData(sheet.google_sheet_id, headerRange)
+
+        if (!headerResponse.success) {
+          console.error("[v0] Failed to load headers:", headerResponse.error)
+          return null
+        }
+
+        const headerValues = headerResponse.data?.values || []
+        if (headerValues.length === 0) {
+          console.error("[v0] No header row found")
+          return null
+        }
+
+        const headers = headerValues[0] || []
+        const numColumns = headers.length
+
+        // Convert column count to letter
+        const getColumnLetter = (colNum: number): string => {
+          let letter = ""
+          while (colNum > 0) {
+            const remainder = (colNum - 1) % 26
+            letter = String.fromCharCode(65 + remainder) + letter
+            colNum = Math.floor((colNum - 1) / 26)
+          }
+          return letter
+        }
+
+        const endCol = getColumnLetter(numColumns)
 
         // Find the existing order to get its row position
         const existingOrder = state.orders.find((o) => o.itemId === itemId)
@@ -485,10 +501,10 @@ export function useOrderData() {
           return null
         }
 
-        // Fetch just the header row and the specific order row
-        const range = `${sheet.tab_name}!${startCol}${headerRow}:${endCol}${existingOrder.rowPosition}`
+        // Step 2: Fetch the specific order row with auto-detected column range
+        const range = `${sheet.tab_name}!A${headerRow}:${endCol}${existingOrder.rowPosition}`
 
-        console.log(`[v0] Reloading order ${itemId} from row ${existingOrder.rowPosition}`)
+        console.log(`[v0] Reloading order ${itemId} from row ${existingOrder.rowPosition} with range A:${endCol}`)
 
         const response = await googleSheetsClient.getSheetData(sheet.google_sheet_id, range)
 
@@ -503,13 +519,13 @@ export function useOrderData() {
           return null
         }
 
-        const headers = rows[0]
+        const dataHeaders = rows[0]
         const orderRow = rows[rows.length - 1] // Last row is the order data
 
         // Cache the headers if not already cached
         if (!cachedHeadersRef.current[sheet.id]) {
           cachedHeadersRef.current[sheet.id] = {
-            headers,
+            headers: dataHeaders,
             timestamp: Date.now(),
             columnMapping,
           }
@@ -521,7 +537,7 @@ export function useOrderData() {
 
         const reloadedOrder = transformRowToOrder(
           orderRow,
-          headers,
+          dataHeaders,
           columnMapping,
           sheet.id,
           rowIndex,
@@ -602,9 +618,43 @@ export function useOrderData() {
         const { columnMapping, dataRange, readDirection, maxRowsPerLoad } = configuration
 
         const headerRow = dataRange.headerRow || 1
-        const columns = dataRange.columns || "A:Z"
-        const [startCol, endCol] = columns.split(":")
 
+        // Step 1: Load header row first to detect number of columns
+        const headerRange = `${sheet.tab_name}!${headerRow}:${headerRow}`
+        const headerResponse = await googleSheetsClient.getSheetData(sheet.google_sheet_id, headerRange)
+
+        if (!headerResponse.success) {
+          if (headerResponse.error?.includes("PERMISSION_DENIED")) {
+            throw new Error(
+              "Permission denied. Please ensure the Google Sheets token has access to this spreadsheet and try reconnecting your Google account.",
+            )
+          }
+          throw new Error(headerResponse.error || "Failed to load sheet headers")
+        }
+
+        const headerValues = headerResponse.data?.values || []
+        if (headerValues.length === 0) {
+          throw new Error("No header row found in sheet")
+        }
+
+        const headers = headerValues[0] || []
+        const numColumns = headers.length
+
+        // Convert column count to letter (e.g., 40 -> AN)
+        const getColumnLetter = (colNum: number): string => {
+          let letter = ""
+          while (colNum > 0) {
+            const remainder = (colNum - 1) % 26
+            letter = String.fromCharCode(65 + remainder) + letter
+            colNum = Math.floor((colNum - 1) / 26)
+          }
+          return letter
+        }
+
+        const endCol = getColumnLetter(numColumns)
+        console.log(`[Auto-detect] Found ${numColumns} columns, using range A:${endCol}`)
+
+        // Step 2: Load data with auto-detected column range
         let range: string
         let actualEndRow: number
 
@@ -614,12 +664,12 @@ export function useOrderData() {
           const dataLoadStartRow = Math.max(headerRow + 1, maxEndRow - maxRowsPerLoad + 1)
           actualEndRow = maxEndRow
 
-          range = `${sheet.tab_name}!${startCol}${headerRow}:${endCol}${actualEndRow}`
+          range = `${sheet.tab_name}!A${headerRow}:${endCol}${actualEndRow}`
         } else {
           const dataStartRow = dataRange.startRow || headerRow + 1
           actualEndRow = Math.min(dataStartRow + maxRowsPerLoad - 1, dataRange.endRow || 100000)
 
-          range = `${sheet.tab_name}!${startCol}${headerRow}:${endCol}${actualEndRow}`
+          range = `${sheet.tab_name}!A${headerRow}:${endCol}${actualEndRow}`
         }
 
         const response = await googleSheetsClient.getSheetData(sheet.google_sheet_id, range)
@@ -655,8 +705,7 @@ export function useOrderData() {
           throw new Error(`Header row ${headerRow} not found in sheet data`)
         }
 
-        const headers = rows[headerRowIndex] || []
-
+        // Headers already loaded from step 1, just cache them
         cachedHeadersRef.current[sheet.id] = {
           headers,
           timestamp: Date.now(),
