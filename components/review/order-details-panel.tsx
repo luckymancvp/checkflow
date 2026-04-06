@@ -187,10 +187,12 @@ export function OrderDetailsPanel({
 
     setProductNoteLoading(true)
     try {
+      const token = localStorage.getItem("auth-token")
       const response = await fetch(`/api/product-type-notes/${encodeURIComponent(order.productType)}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           content: productTypeNote,
@@ -218,10 +220,12 @@ export function OrderDetailsPanel({
   const handleSaveLinks = async () => {
     setLinksLoading(true)
     try {
+      const token = localStorage.getItem("auth-token")
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           itemId: order.itemId,

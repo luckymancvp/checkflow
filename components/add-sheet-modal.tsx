@@ -99,7 +99,7 @@ export function AddSheetModal({ open, onOpenChange, onSuccess, sheetToEdit }: Ad
     headerRow: 1,
     startRow: 2,
     endRow: null,
-    columns: "A:N",
+    columns: "A:AW",
     readDirection: "top-to-bottom",
     maxRowsPerLoad: 500,
     columnMapping: {
@@ -157,7 +157,7 @@ export function AddSheetModal({ open, onOpenChange, onSuccess, sheetToEdit }: Ad
           headerRow: 1,
           startRow: 2,
           endRow: null,
-          columns: "A:N",
+          columns: "A:AW",
           readDirection: "top-to-bottom",
           maxRowsPerLoad: 500,
           columnMapping: {

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
@@ -720,6 +720,9 @@ export function OrderReviewModal({
           hasMultipleReviewers ? "ring-4 ring-purple-500 ring-opacity-50" : ""
         }`}
       >
+        <DialogTitle className="sr-only">
+          Order Review - {order?.itemId || "Loading..."}
+        </DialogTitle>
         {/* Header */}
         <div
           className={`flex items-center justify-between px-4 py-2 border-b border-gray-200 ${

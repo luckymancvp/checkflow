@@ -384,6 +384,9 @@ export function useOrderData() {
         const getColumnValue = (fieldName: string): string => {
           const columnHeader = columnMapping[fieldName]
           if (!columnHeader) {
+            if (fieldName === "mockup") {
+              console.log(`[DEBUG] No column mapping for mockup field`)
+            }
             return ""
           }
 
@@ -391,14 +394,24 @@ export function useOrderData() {
           const columnIndex = headers.findIndex((header) => header === columnHeader)
 
           if (columnIndex === -1) {
+            if (fieldName === "mockup") {
+              console.log(`[DEBUG] Mockup column '${columnHeader}' not found in headers:`, headers)
+            }
             return ""
           }
 
           if (columnIndex >= row.length) {
+            if (fieldName === "mockup") {
+              console.log(`[DEBUG] Mockup column index ${columnIndex} >= row length ${row.length}`)
+              console.log(`[DEBUG] Row data:`, row)
+            }
             return ""
           }
 
           const value = row[columnIndex]?.toString().trim() || ""
+          if (fieldName === "mockup" && value) {
+            console.log(`[DEBUG] Found mockup value at index ${columnIndex}:`, value)
+          }
           return value
         }
 
