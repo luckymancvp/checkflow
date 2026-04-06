@@ -308,6 +308,12 @@ export function OrderDetailsPanel({
                 <span className="font-medium">{order.productName || "N/A"}</span>
               )}
             </div>
+            {order.country && (
+              <div>
+                <span className="text-gray-600">Country:</span>{" "}
+                <span className="font-medium">{order.country}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

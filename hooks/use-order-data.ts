@@ -433,6 +433,7 @@ export function useOrderData() {
           productImage: getColumnValue("image"),
           productType: getColumnValue("productType"),
           productName: getColumnValue("productName"),
+          country: getColumnValue("country"),
           rowPosition: actualRowPosition,
         }
 
