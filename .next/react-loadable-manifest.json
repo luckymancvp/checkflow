@@ -1,0 +1,14 @@
+{
+  "lib\\sentry.ts -> @sentry/nextjs": {
+    "id": "lib\\sentry.ts -> @sentry/nextjs",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_sentry_nextjs_10_32_1__ope_c1326c49b492499ce11804929269c-387bd7.js"
+    ]
+  },
+  "node_modules\\.pnpm\\next@15.1.11_@babel+core@7._2345dea3e07430f64212bb3675a4b91a\\node_modules\\next\\dist\\client\\components\\react-dev-overlay\\internal\\helpers\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts": {
+    "id": "node_modules\\.pnpm\\next@15.1.11_@babel+core@7._2345dea3e07430f64212bb3675a4b91a\\node_modules\\next\\dist\\client\\components\\react-dev-overlay\\internal\\helpers\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_next_15_1_11__babel_core_7__2345dea3e07430f64212bb3675a4-01be49.js"
+    ]
+  }
+}
