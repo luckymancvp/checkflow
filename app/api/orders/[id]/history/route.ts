@@ -3,11 +3,11 @@ import { authenticateRequest, unauthorizedResponse } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase"
 import { logServerError, logServerInfo } from "@/lib/server-sentry"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const appUser = await authenticateRequest(request)
     const supabase = createServerClient()
-    const orderId = params.id
+    const { id: orderId } = await params
 
     // First try to find order by UUID, then by item_id
     let orderQuery = supabase.from("orders").select("id, item_id, google_sheet_id")
