@@ -2,17 +2,62 @@
 
 import { useRouter } from "next/navigation"
 import { useOrderData } from "@/hooks/use-order-data"
+import { useMeraProjects } from "@/hooks/use-mera-projects"
+import { useMeraOrders } from "@/hooks/use-mera-orders"
+import { useMeraMutations } from "@/hooks/use-mera-mutations"
+import { adaptMeraOrders } from "@/lib/mera-adapter"
 import { SheetSelector } from "@/components/review/sheet-selector"
 import { OrderListHeader } from "@/components/review/order-list-header"
 import { SyncStatusIndicator } from "@/components/sync-status-indicator"
 import type { Order } from "@/types/order"
+import type { MeraOrder, MeraListOrdersParams } from "@/types/mera-order"
 import { useState, useEffect, useMemo } from "react"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
-import { RefreshCw } from "lucide-react"
+import { RefreshCw, Database, Sheet } from "lucide-react"
+
+type DataSource = "sheets" | "mera"
+
+// Reverse map: CheckFlow status → Mera status for item PATCH
+const CHECKFLOW_TO_MERA_STATUS: Record<string, string> = {
+  DESIGNED: "DESIGNING",
+  CONFIRMED: "CONFIRMED",
+  NEED_REPAIR: "NEED_REPAIR",
+  REPAIRED: "REPAIRED",
+}
 
 export default function ReviewPage() {
   const router = useRouter()
+
+  // ── Source toggle ──────────────────────────────────────────────────────────
+  const [dataSource, setDataSource] = useState<DataSource>("sheets")
+
+  // ── Mera state ────────────────────────────────────────────────────────────
+  const [meraProjectId, setMeraProjectId] = useState<string>("")
+  const [meraParams, setMeraParams] = useState<MeraListOrdersParams>({
+    page: 1,
+    page_size: 50,
+    include_items: true,
+  })
+  const { projects: meraProjects, loading: meraProjectsLoading } = useMeraProjects()
+  const {
+    orders: rawMeraOrders,
+    total: meraTotal,
+    page: meraPage,
+    page_size: merPageSize,
+    total_pages: meraTotalPages,
+    loading: meraLoading,
+    error: meraError,
+    refetch: meraRefetch,
+  } = useMeraOrders(dataSource === "mera" ? { ...meraParams, project_id: meraProjectId || undefined } : { page: 1, page_size: 1 })
+  const { patchItem: meraPatchItem } = useMeraMutations()
+
+  const meraOrders = useMemo(
+    () => (dataSource === "mera" ? adaptMeraOrders(rawMeraOrders) : []),
+    [dataSource, rawMeraOrders]
+  )
+
+  // ── Sheets state ──────────────────────────────────────────────────────────
   const {
     orders,
     allOrders, // Added allOrders to get all orders regardless of pagination
@@ -39,6 +84,11 @@ export default function ReviewPage() {
     updateOrderStatus,
     reloadOrderFromSheet, // Import the new reload function
   } = useOrderData()
+
+  // Active orders depending on source
+  const activeOrders = dataSource === "mera" ? meraOrders : orders
+  const activeLoading = dataSource === "mera" ? meraLoading : loading
+  const activeError = dataSource === "mera" ? meraError : error
 
   const [reviewMode, setReviewMode] = useState<{
     isActive: boolean
@@ -233,14 +283,40 @@ export default function ReviewPage() {
   }
 
   const handleStartSequentialReview = () => {
-    if (orders.length === 0) return
+    if (activeOrders.length === 0) return
 
-    console.log("[ReviewPage] Starting sequential review with", orders.length, "orders")
     setReviewMode({
       isActive: true,
       currentIndex: 0,
-      orders: orders,
+      orders: activeOrders,
     })
+  }
+
+  // Mera-specific status update (item PATCH)
+  const handleMeraStatusUpdate = async (
+    order: Order & { _mera?: MeraOrder },
+    newStatus: Order["status"],
+    note?: string,
+  ): Promise<boolean> => {
+    const meraOrder = order._mera
+    if (!meraOrder) return false
+
+    const item = meraOrder.items?.[0]
+    if (!item) return false
+
+    try {
+      await meraPatchItem(item.item_key, {
+        version: item.version,
+        status: CHECKFLOW_TO_MERA_STATUS[newStatus] ?? newStatus,
+      })
+      if (note !== undefined && note !== meraOrder.note) {
+        // note lives on the order level — would need patchOrder; skip for now
+      }
+      await meraRefetch()
+      return true
+    } catch {
+      return false
+    }
   }
 
   const handleReviewClose = () => {
@@ -377,34 +453,20 @@ export default function ReviewPage() {
     if (!reviewMode) return
 
     const currentOrder = reviewMode.orders[reviewMode.currentIndex]
-    console.log("[ReviewPage] Review action:", action, "for order:", currentOrder.itemId)
 
     if (action === "confirm") {
-      console.log("[ReviewPage] Confirming order, updating status to CONFIRMED")
-      const success = await updateOrderStatus(currentOrder, "CONFIRMED", note)
-
-      if (!success) {
-        console.error("[ReviewPage] Failed to update order status to CONFIRMED")
-        return
-      }
-
-      console.log("[ReviewPage] Successfully confirmed order:", currentOrder.itemId)
+      const targetStatus: Order["status"] = "CONFIRMED"
+      const success = dataSource === "mera"
+        ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note)
+        : await updateOrderStatus(currentOrder, targetStatus, note)
+      if (!success) return
     } else if (action === "need_repair") {
-      console.log("[ReviewPage] Marking order as needing repair with type:", repairType)
-
-      if (!repairType) {
-        console.error("[ReviewPage] Change type is required for NEED_REPAIR action")
-        return
-      }
-
-      const success = await updateOrderStatus(currentOrder, "NEED_REPAIR", note, repairType)
-
-      if (!success) {
-        console.error("[ReviewPage] Failed to update order status to NEED_REPAIR")
-        return
-      }
-
-      console.log("[ReviewPage] Successfully marked order as needing repair:", currentOrder.itemId)
+      if (!repairType) return
+      const targetStatus: Order["status"] = "NEED_REPAIR"
+      const success = dataSource === "mera"
+        ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note)
+        : await updateOrderStatus(currentOrder, targetStatus, note, repairType)
+      if (!success) return
     }
 
     if (reviewMode.currentIndex < reviewMode.orders.length - 1) {
@@ -422,26 +484,21 @@ export default function ReviewPage() {
     if (!reviewMode) return
 
     const currentOrder = reviewMode.orders[reviewMode.currentIndex]
-    console.log("[ReviewPage] Status dropdown update:", newStatus, "for order:", currentOrder.itemId)
 
-    const success = await updateOrderStatus(currentOrder, newStatus, note, changeType)
-    if (!success) {
-      console.error("[ReviewPage] Failed to update order status via dropdown")
-    } else {
-      console.log("[ReviewPage] Successfully updated order status via dropdown:", currentOrder.itemId)
+    const success = dataSource === "mera"
+      ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, newStatus, note)
+      : await updateOrderStatus(currentOrder, newStatus, note, changeType)
 
+    if (success) {
       setReviewMode((prev) => {
         if (!prev) return prev
-
-        const updatedOrders = prev.orders.map((order) =>
-          order.itemId === currentOrder.itemId
-            ? { ...order, status: newStatus, orderNote: note !== undefined ? note : order.orderNote }
-            : order,
-        )
-
         return {
           ...prev,
-          orders: updatedOrders,
+          orders: prev.orders.map((order) =>
+            order.itemId === currentOrder.itemId
+              ? { ...order, status: newStatus, orderNote: note !== undefined ? note : order.orderNote }
+              : order,
+          ),
         }
       })
     }
@@ -491,33 +548,130 @@ export default function ReviewPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Order Review</h1>
-              <p className="text-gray-600 mt-2">Select a Google Sheet and review orders for quality assurance</p>
+              <p className="text-gray-600 mt-2">
+                {dataSource === "sheets"
+                  ? "Select a Google Sheet and review orders for quality assurance"
+                  : "Review orders from Mera system"}
+              </p>
             </div>
             <div className="flex items-center gap-4">
-              <SyncStatusIndicator
-                status={syncStatus}
-                pendingChanges={pendingChanges}
-                error={syncError}
-                onManualSync={triggerManualSync}
-              />
+              {/* Source toggle */}
+              <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
+                <button
+                  onClick={() => setDataSource("sheets")}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
+                    dataSource === "sheets"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Sheet className="h-4 w-4" />
+                  Google Sheets
+                </button>
+                <button
+                  onClick={() => setDataSource("mera")}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
+                    dataSource === "mera"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Database className="h-4 w-4" />
+                  Mera
+                </button>
+              </div>
+
+              {dataSource === "sheets" && (
+                <SyncStatusIndicator
+                  status={syncStatus}
+                  pendingChanges={pendingChanges}
+                  error={syncError}
+                  onManualSync={triggerManualSync}
+                />
+              )}
             </div>
           </div>
         </div>
 
-        <SheetSelector
-          sheets={sheets}
-          selectedSheet={selectedSheet}
-          loading={loading}
-          onSheetSelect={handleSheetSelect}
-          onRefresh={refreshData}
-          lastSync={lastSync}
-          syncStatus={syncStatus}
-          pendingChanges={pendingChanges}
-          syncError={syncError}
-          onManualSync={triggerManualSync}
-        />
+        {/* Sheets source */}
+        {dataSource === "sheets" && (
+          <SheetSelector
+            sheets={sheets}
+            selectedSheet={selectedSheet}
+            loading={loading}
+            onSheetSelect={handleSheetSelect}
+            onRefresh={refreshData}
+            lastSync={lastSync}
+            syncStatus={syncStatus}
+            pendingChanges={pendingChanges}
+            syncError={syncError}
+            onManualSync={triggerManualSync}
+          />
+        )}
 
-        {selectedSheet && !isLoadingNewSheet && (
+        {/* Mera source — project selector */}
+        {dataSource === "mera" && (
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium text-gray-700 shrink-0">Project</label>
+              {meraProjectsLoading ? (
+                <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
+              ) : (
+                <select
+                  value={meraProjectId}
+                  onChange={(e) => {
+                    setMeraProjectId(e.target.value)
+                    setMeraParams((p) => ({ ...p, page: 1 }))
+                  }}
+                  className="flex-1 max-w-xs rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— All projects —</option>
+                  {meraProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={() => meraRefetch()}
+                className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${meraLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+              {meraError && <span className="text-sm text-red-500">{meraError}</span>}
+            </div>
+          </div>
+        )}
+
+        {/* Mera order list */}
+        {dataSource === "mera" && (
+          <OrderListHeader
+            totalCount={meraTotal}
+            filteredCount={meraOrders.length}
+            filters={filters}
+            onFiltersChange={applyFilters}
+            onStartSequentialReview={handleStartSequentialReview}
+            loadingTime={null}
+            pagination={{
+              page: meraPage,
+              pageSize: merPageSize,
+              totalPages: meraTotalPages,
+            }}
+            onPageSizeChange={(size) => setMeraParams((p) => ({ ...p, page_size: size, page: 1 }))}
+            onPageChange={(page) => setMeraParams((p) => ({ ...p, page }))}
+            filterOptions={filterOptions}
+            statusCounts={statusCounts}
+            designerCounts={filteredCounts.designerCounts}
+            productTypeCounts={filteredCounts.productTypeCounts}
+            storeCounts={filteredCounts.storeCounts}
+            onRefresh={meraRefetch}
+          />
+        )}
+
+        {/* Sheets order list */}
+        {dataSource === "sheets" && selectedSheet && !isLoadingNewSheet && (
           <OrderListHeader
             totalCount={totalCount}
             filteredCount={filteredCount}
@@ -542,7 +696,7 @@ export default function ReviewPage() {
           />
         )}
 
-        {selectedSheet && isLoadingNewSheet && (
+        {dataSource === "sheets" && selectedSheet && isLoadingNewSheet && (
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8">
             <div className="flex items-center justify-center">
               <RefreshCw className="h-6 w-6 animate-spin mr-3 text-blue-600" />
