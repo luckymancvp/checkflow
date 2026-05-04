@@ -11,9 +11,10 @@ interface ApiResponse<T> {
   refetch: () => Promise<void>
 }
 
-export function useApi<T>(endpoint: string): ApiResponse<T> {
+export function useApi<T>(endpoint: string, options?: { enabled?: boolean }): ApiResponse<T> {
+  const enabled = options?.enabled ?? true
   const [data, setData] = useState<T | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
   const { user, signOut, getToken } = useAuth() // Get getToken from context
 
@@ -63,13 +64,13 @@ export function useApi<T>(endpoint: string): ApiResponse<T> {
   }, [endpoint, user, signOut, getToken]) // Add getToken to dependencies
 
   useEffect(() => {
-    if (user) {
-      // Only fetch if user is present (meaning token is likely in localStorage)
+    if (enabled && user) {
+      // Only fetch if enabled and user is present
       fetchData()
     } else {
       setLoading(false)
     }
-  }, [fetchData, user])
+  }, [fetchData, user, enabled])
 
   return { data, loading, error, refetch: fetchData }
 }

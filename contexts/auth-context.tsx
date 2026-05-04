@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   // Define public routes that don't need authentication check
-  const publicRoutes = ["/login", "/auth/callback", "/auth/success"]
+  const publicRoutes = ["/login", "/login_dev", "/auth/callback", "/auth/success"]
   const isPublicRoute = publicRoutes.includes(pathname)
 
   const getToken = useCallback(() => {

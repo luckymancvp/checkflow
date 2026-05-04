@@ -65,6 +65,12 @@ export function useOrderComments(itemId: string) {
         const result = await response.json()
 
         if (result.success) {
+          setComments((prev) => {
+            const exists = prev.some((c) => c.id === result.data.id)
+            if (exists) return prev
+            return [...prev, result.data]
+          })
+          setError(null)
           return true
         } else {
           setError(result.error || "Failed to post comment")

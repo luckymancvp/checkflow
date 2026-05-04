@@ -5,11 +5,11 @@ import { logServerError, logServerInfo } from "@/lib/server-sentry"
 import { publishToChannel } from "@/lib/ably-client"
 
 // GET - Fetch all comments for an order item
-export async function GET(request: NextRequest, { params }: { params: { itemId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ itemId: string }> }) {
   try {
     const appUser = await authenticateRequest(request)
     const supabase = createServerClient()
-    const { itemId } = params
+    const { itemId } = await params
 
     const { data: comments, error } = await supabase
       .from("order_comments")
@@ -58,11 +58,11 @@ export async function GET(request: NextRequest, { params }: { params: { itemId: 
 }
 
 // POST - Create a new comment
-export async function POST(request: NextRequest, { params }: { params: { itemId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ itemId: string }> }) {
   try {
     const appUser = await authenticateRequest(request)
     const supabase = createServerClient()
-    const { itemId } = params
+    const { itemId } = await params
     const body = await request.json()
 
     const { comment_text, user_name, user_email, user_avatar } = body

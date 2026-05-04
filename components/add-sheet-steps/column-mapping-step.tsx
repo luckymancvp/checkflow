@@ -32,6 +32,7 @@ const FIELD_MAPPINGS = [
   { key: "image", label: "Product Image", description: "Product image", required: false },
   { key: "productType", label: "Product Type", description: "Type of product", required: false },
   { key: "productName", label: "Product Name", description: "Product name", required: false },
+  { key: "country", label: "Country", description: "Customer country", required: false },
 ]
 
 const AUTO_MAPPING_PATTERNS = {
@@ -48,6 +49,7 @@ const AUTO_MAPPING_PATTERNS = {
   image: ["image"],
   productType: ["product type"],
   productName: ["product name"],
+  country: ["country"],
 }
 
 export function ColumnMappingStep({
