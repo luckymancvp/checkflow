@@ -49,7 +49,6 @@ class MeraClient {
     }
 
     if (options?.actor) {
-      headers["X-Actor-ID"] = options.actor.id
       headers["X-Actor-Email"] = options.actor.email
     }
 
@@ -78,8 +77,8 @@ class MeraClient {
     return res.json() as Promise<T>
   }
 
-  async listProjects(): Promise<MeraProject[]> {
-    const data = await this.request<{ projects: MeraProject[] }>("GET", "/api/v1/projects")
+  async listProjects(actor?: MeraActor): Promise<MeraProject[]> {
+    const data = await this.request<{ projects: MeraProject[] }>("GET", "/api/v1/projects", { actor })
     return data.projects
   }
 
@@ -111,7 +110,6 @@ class MeraClient {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${this.apiKey}`,
-      "X-Actor-ID": actor.id,
       "X-Actor-Email": actor.email,
     }
 

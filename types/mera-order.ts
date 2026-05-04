@@ -118,6 +118,7 @@ export interface MeraListOrdersResponse {
   page: number
   page_size: number
   total_pages: number
+  status_counts?: Record<string, number>
 }
 
 export interface MeraPatchOrderBody {

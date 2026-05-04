@@ -11,12 +11,14 @@ interface UseMeraOrdersResult {
   page: number
   page_size: number
   total_pages: number
+  status_counts: Record<string, number>
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
 }
 
-export function useMeraOrders(params: MeraListOrdersParams): UseMeraOrdersResult {
+export function useMeraOrders(params: MeraListOrdersParams, options?: { enabled?: boolean }): UseMeraOrdersResult {
+  const enabled = options?.enabled ?? true
   const [result, setResult] = useState<MeraListOrdersResponse>({
     orders: [],
     total: 0,
@@ -26,7 +28,7 @@ export function useMeraOrders(params: MeraListOrdersParams): UseMeraOrdersResult
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { user, signOut, getToken } = useAuth()
+  const { user, getToken } = useAuth()
   const paramsRef = useRef(params)
   paramsRef.current = params
 
@@ -63,11 +65,6 @@ export function useMeraOrders(params: MeraListOrdersParams): UseMeraOrdersResult
       })
 
       if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          await signOut()
-          setError("Your session has expired. Please log in again.")
-          return
-        }
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || `HTTP ${res.status}`)
       }
@@ -81,14 +78,15 @@ export function useMeraOrders(params: MeraListOrdersParams): UseMeraOrdersResult
     } finally {
       setLoading(false)
     }
-  }, [user, signOut, getToken])
+  }, [user, getToken])
 
   useEffect(() => {
-    if (user) fetchOrders()
+    if (enabled && user) fetchOrders()
     else setLoading(false)
   }, [
     fetchOrders,
     user,
+    enabled,
     params.page,
     params.page_size,
     params.project_id,
@@ -102,5 +100,5 @@ export function useMeraOrders(params: MeraListOrdersParams): UseMeraOrdersResult
     params.include_items,
   ])
 
-  return { ...result, loading, error, refetch: fetchOrders }
+  return { ...result, status_counts: result.status_counts ?? {}, loading, error, refetch: fetchOrders }
 }

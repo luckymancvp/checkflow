@@ -35,7 +35,8 @@ interface CachedSheetHeaders {
 const FILTER_STORAGE_KEY = "checkflow_order_filters"
 const BLANK_DESIGNER_VALUE = "[Blank]"
 
-export function useOrderData() {
+export function useOrderData(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true
   const loadFiltersFromStorage = useCallback((): OrderFilters => {
     try {
       const stored = localStorage.getItem(FILTER_STORAGE_KEY)
@@ -91,7 +92,7 @@ export function useOrderData() {
   const cachedHeadersRef = useRef<CachedSheetHeaders>({})
 
   // Load available sheets
-  const { data: sheetsResponse, loading: sheetsLoading, error: sheetsError } = useApi<SheetListResponse>("/sheets")
+  const { data: sheetsResponse, loading: sheetsLoading, error: sheetsError } = useApi<SheetListResponse>("/sheets", { enabled })
   const sheets = sheetsResponse?.data || []
 
   const { mutate: callOrderAPI, loading: apiLoading } = useApiMutation()

@@ -1,10 +1,11 @@
 # Order API V2 — Designer & Fulfill Backends
 
-Base URL: `http://<designer-backend-host>:<port>/api/v2`  
-hoặc: `http://<fulfill-backend-host>:<port>/api/v2`
+Base URL:
+- **Fulfill:** `https://mera-fulfill-api.pamoteam.top/api/v2`
+- **Designer:** `https://mera-designer-api.pamoteam.top/api/v2`
 
 API dùng chung (shared controller tại `mera-shared/pkg/orderhttp`) được expose bởi cả `mera-designer-backend` và `mera-fulfill-backend`.  
-Yêu cầu authentication (JWT token).
+Yêu cầu authentication (JWT hoặc Internal API Key).
 
 ---
 
@@ -24,18 +25,19 @@ INTERNAL_API_KEY=<your-secret-key>
 **Gọi API — không cần biết user:**
 ```bash
 curl -H "Authorization: Bearer <your-secret-key>" \
-  http://designer-backend:port/api/v2/orders
+  https://mera-fulfill-api.pamoteam.top/api/v2/orders
 ```
 
 **Gọi API — kèm thông tin user để ghi audit:**
 ```bash
 curl -H "Authorization: Bearer <your-secret-key>" \
-     -H "X-Actor-ID: user-123" \
      -H "X-Actor-Email: nguyen@company.com" \
-  http://designer-backend:port/api/v2/orders
+  https://mera-fulfill-api.pamoteam.top/api/v2/orders
 ```
 
 Khi có `X-Actor-Email`, audit log sẽ ghi đúng user thực hiện thay đổi. Nếu không truyền, mặc định ghi `"email": "internal-service"`.
+
+> **Lưu ý:** `X-Actor-ID` không bắt buộc. Nếu gọi từ hệ thống bên ngoài không biết Mera user ID, chỉ cần truyền `X-Actor-Email` là đủ.
 
 ### 2. JWT (dành cho người dùng đăng nhập qua Google OAuth)
 
@@ -44,11 +46,51 @@ JWT được cấp sau khi user đăng nhập qua `mera-admin-backend`. Truyền
 ```bash
 # Header
 curl -H "Authorization: Bearer <jwt-token>" \
-  http://designer-backend:port/api/v2/orders
+  https://mera-fulfill-api.pamoteam.top/api/v2/orders
 
 # Query param (SSE EventSource)
 GET /api/v2/orders?token=<jwt-token>
 ```
+
+---
+
+## Get Projects (v1)
+
+```
+GET /api/v1/projects
+```
+
+Lấy danh sách projects. Dùng để lấy `project_id` cho filter orders.
+
+Endpoint này có trên cả 3 backend (admin, designer, fulfill). Ở designer và fulfill nó là proxy gọi về admin backend.
+
+**Gọi qua fulfill backend:**
+
+```bash
+curl -H "Authorization: Bearer <INTERNAL_API_KEY>" \
+     -H "X-Actor-Email: cuonglm@pamoteam.com" \
+  https://mera-fulfill-api.pamoteam.top/api/v1/projects
+```
+
+- **JWT:** chỉ trả projects mà user là thành viên.
+- **Internal API Key:** trả tất cả projects (không filter theo user).
+- **`X-Actor-ID`:** không bắt buộc. Nếu gọi từ hệ thống bên ngoài, chỉ cần truyền `X-Actor-Email`.
+
+### Response `200 OK`
+
+```json
+{
+  "projects": [
+    {
+      "id": "64a1b2c3d4e5f6a7b8c9d0e1",
+      "name": "DavShop",
+      "team_member_ids": ["64a1b2c3d4e5f6a7b8c9d0e2"]
+    }
+  ]
+}
+```
+
+Dùng `id` từ response này làm `project_id` khi gọi `GET /api/v2/orders?project_id=<id>`.
 
 ---
 

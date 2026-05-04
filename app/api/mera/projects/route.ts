@@ -8,14 +8,15 @@ let cache: ProjectsCache | null = null
 
 export async function GET(request: NextRequest) {
   try {
-    await authenticateRequest(request)
+    const appUser = await authenticateRequest(request)
+    const actor = { id: appUser.sub, email: appUser.email }
 
     const now = Date.now()
     if (cache && cache.expiresAt > now) {
       return NextResponse.json(cache.data)
     }
 
-    const projects = await meraClient.listProjects()
+    const projects = await meraClient.listProjects(actor)
     const response = { projects }
     cache = { data: response, expiresAt: now + 5 * 60 * 1000 }
 

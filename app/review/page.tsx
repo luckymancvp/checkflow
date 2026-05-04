@@ -8,6 +8,7 @@ import { useMeraMutations } from "@/hooks/use-mera-mutations"
 import { adaptMeraOrders } from "@/lib/mera-adapter"
 import { SheetSelector } from "@/components/review/sheet-selector"
 import { OrderListHeader } from "@/components/review/order-list-header"
+import { OrderList } from "@/components/review/order-list"
 import { SyncStatusIndicator } from "@/components/sync-status-indicator"
 import type { Order } from "@/types/order"
 import type { MeraOrder, MeraListOrdersParams } from "@/types/mera-order"
@@ -39,23 +40,73 @@ export default function ReviewPage() {
     page_size: 50,
     include_items: true,
   })
-  const { projects: meraProjects, loading: meraProjectsLoading } = useMeraProjects()
+  const { projects: meraProjects, loading: meraProjectsLoading } = useMeraProjects({ enabled: dataSource === "mera" })
   const {
     orders: rawMeraOrders,
     total: meraTotal,
     page: meraPage,
     page_size: merPageSize,
     total_pages: meraTotalPages,
+    status_counts: meraStatusCounts,
     loading: meraLoading,
     error: meraError,
     refetch: meraRefetch,
-  } = useMeraOrders(dataSource === "mera" ? { ...meraParams, project_id: meraProjectId || undefined } : { page: 1, page_size: 1 })
+  } = useMeraOrders(
+    dataSource === "mera" ? { ...meraParams, project_id: meraProjectId || undefined } : { page: 1, page_size: 1 },
+    { enabled: dataSource === "mera" }
+  )
   const { patchItem: meraPatchItem } = useMeraMutations()
 
   const meraOrders = useMemo(
     () => (dataSource === "mera" ? adaptMeraOrders(rawMeraOrders) : []),
     [dataSource, rawMeraOrders]
   )
+
+  // ── Mera filter options (derived from current page of mera orders) ────────
+  const meraFilterOptions = useMemo(() => {
+    if (dataSource !== "mera") return { statuses: [], designers: [], productTypes: [], stores: [] }
+    const statuses = [...new Set(meraOrders.map((o) => o.status))]
+    // Also include statuses from status_counts that may not be on current page
+    Object.keys(meraStatusCounts).forEach((s) => {
+      if (!statuses.includes(s)) statuses.push(s)
+    })
+    const allDesigners = meraOrders.map((o) => o.designer)
+    const hasBlank = allDesigners.some((d) => !d || d.trim() === "")
+    const nonBlank = [...new Set(allDesigners.filter((d) => d && d.trim() !== ""))]
+    const designers = hasBlank ? ["[Blank]", ...nonBlank] : nonBlank
+    return {
+      statuses,
+      designers,
+      productTypes: [...new Set(meraOrders.map((o) => o.productType).filter(Boolean))] as string[],
+      stores: [...new Set(meraOrders.map((o) => o.store).filter(Boolean))] as string[],
+    }
+  }, [dataSource, meraOrders, meraStatusCounts])
+
+  const meraDerivedStatusCounts = useMemo(() => {
+    if (dataSource !== "mera") return {}
+    // Use server-provided status_counts if available, otherwise compute from orders
+    if (Object.keys(meraStatusCounts).length > 0) return meraStatusCounts
+    const counts: Record<string, number> = {}
+    meraOrders.forEach((o) => { counts[o.status] = (counts[o.status] || 0) + 1 })
+    return counts
+  }, [dataSource, meraOrders, meraStatusCounts])
+
+  const meraDerivedFilteredCounts = useMemo(() => {
+    const designerCounts: Record<string, number> = {}
+    const productTypeCounts: Record<string, number> = {}
+    const storeCounts: Record<string, number> = {}
+    if (dataSource !== "mera") return { designerCounts, productTypeCounts, storeCounts }
+    meraOrders.forEach((o) => {
+      if (o.designer && o.designer.trim() !== "") {
+        designerCounts[o.designer] = (designerCounts[o.designer] || 0) + 1
+      } else {
+        designerCounts["[Blank]"] = (designerCounts["[Blank]"] || 0) + 1
+      }
+      if (o.productType) productTypeCounts[o.productType] = (productTypeCounts[o.productType] || 0) + 1
+      if (o.store) storeCounts[o.store] = (storeCounts[o.store] || 0) + 1
+    })
+    return { designerCounts, productTypeCounts, storeCounts }
+  }, [dataSource, meraOrders])
 
   // ── Sheets state ──────────────────────────────────────────────────────────
   const {
@@ -83,7 +134,7 @@ export default function ReviewPage() {
     changePage,
     updateOrderStatus,
     reloadOrderFromSheet, // Import the new reload function
-  } = useOrderData()
+  } = useOrderData({ enabled: dataSource === "sheets" })
 
   // Active orders depending on source
   const activeOrders = dataSource === "mera" ? meraOrders : orders
@@ -258,6 +309,7 @@ export default function ReviewPage() {
   }, [allOrders, filters])
 
   useEffect(() => {
+    if (dataSource !== "sheets") return
     const refreshTokensOnLoad = async () => {
       try {
         console.log("[ReviewPage] Refreshing tokens on page load...")
@@ -269,7 +321,7 @@ export default function ReviewPage() {
     }
 
     refreshTokensOnLoad()
-  }, [])
+  }, [dataSource])
 
   const handleSheetSelect = async (sheet: any) => {
     console.log("[ReviewPage] Sheet selected:", sheet.name)
@@ -661,11 +713,11 @@ export default function ReviewPage() {
             }}
             onPageSizeChange={(size) => setMeraParams((p) => ({ ...p, page_size: size, page: 1 }))}
             onPageChange={(page) => setMeraParams((p) => ({ ...p, page }))}
-            filterOptions={filterOptions}
-            statusCounts={statusCounts}
-            designerCounts={filteredCounts.designerCounts}
-            productTypeCounts={filteredCounts.productTypeCounts}
-            storeCounts={filteredCounts.storeCounts}
+            filterOptions={meraFilterOptions}
+            statusCounts={meraDerivedStatusCounts}
+            designerCounts={meraDerivedFilteredCounts.designerCounts}
+            productTypeCounts={meraDerivedFilteredCounts.productTypeCounts}
+            storeCounts={meraDerivedFilteredCounts.storeCounts}
             onRefresh={meraRefetch}
           />
         )}

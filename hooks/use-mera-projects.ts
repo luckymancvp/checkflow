@@ -5,11 +5,12 @@ import { useAuth } from "@/contexts/auth-context"
 import { logError } from "@/lib/sentry"
 import type { MeraProject } from "@/types/mera-order"
 
-export function useMeraProjects() {
+export function useMeraProjects(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true
   const [projects, setProjects] = useState<MeraProject[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { user, signOut, getToken } = useAuth()
+  const { user, getToken } = useAuth()
 
   const fetchProjects = useCallback(async () => {
     const token = getToken()
@@ -30,11 +31,6 @@ export function useMeraProjects() {
       })
 
       if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          await signOut()
-          setError("Your session has expired. Please log in again.")
-          return
-        }
         const result = await res.json().catch(() => ({}))
         throw new Error(result.error || `HTTP ${res.status}`)
       }
@@ -48,12 +44,12 @@ export function useMeraProjects() {
     } finally {
       setLoading(false)
     }
-  }, [user, signOut, getToken])
+  }, [user, getToken])
 
   useEffect(() => {
-    if (user) fetchProjects()
+    if (enabled && user) fetchProjects()
     else setLoading(false)
-  }, [fetchProjects, user])
+  }, [fetchProjects, user, enabled])
 
   return { projects, loading, error, refetch: fetchProjects }
 }
