@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { logError } from "@/lib/sentry"
+import { toast } from "@/hooks/use-toast"
 import type {
   MeraBulkPatchItemsBody,
   MeraOrder,
@@ -53,6 +54,7 @@ export function useMeraMutations() {
         if (result.ok) return result.data
 
         if (result.status === 409) {
+          toast({ title: "Trạng thái đơn trên mera đã thay đổi", variant: "destructive" })
           const err: VersionConflictError = {
             isVersionConflict: true,
             latest: (result.payload as { latest: MeraOrder }).latest,
@@ -85,6 +87,7 @@ export function useMeraMutations() {
         if (result.ok) return result.data
 
         if (result.status === 409) {
+          toast({ title: "Trạng thái đơn trên mera đã thay đổi", variant: "destructive" })
           const err: VersionConflictError = {
             isVersionConflict: true,
             latest: (result.payload as { latest: MeraOrderItem }).latest,
@@ -117,6 +120,7 @@ export function useMeraMutations() {
         if (result.ok) return result.data
 
         if (result.status === 409) {
+          toast({ title: "Trạng thái đơn trên mera đã thay đổi", variant: "destructive" })
           const err: VersionConflictError = {
             isVersionConflict: true,
             latest: (result.payload as { items: MeraOrderItem[] }).items as unknown as MeraOrderItem,

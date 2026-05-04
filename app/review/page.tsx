@@ -13,6 +13,7 @@ import { SyncStatusIndicator } from "@/components/sync-status-indicator"
 import type { Order } from "@/types/order"
 import type { MeraOrder, MeraListOrdersParams } from "@/types/mera-order"
 import { useState, useEffect, useMemo } from "react"
+import { useToast } from "@/hooks/use-toast"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import { RefreshCw, Database, Sheet } from "lucide-react"
@@ -29,6 +30,7 @@ const CHECKFLOW_TO_MERA_STATUS: Record<string, string> = {
 
 export default function ReviewPage() {
   const router = useRouter()
+  const { toast } = useToast()
 
   // ── Source toggle ──────────────────────────────────────────────────────────
   const [dataSource, setDataSource] = useState<DataSource>("sheets")
@@ -37,7 +39,7 @@ export default function ReviewPage() {
   const [meraProjectId, setMeraProjectId] = useState<string>("")
   const [meraParams, setMeraParams] = useState<MeraListOrdersParams>({
     page: 1,
-    page_size: 50,
+    page_size: 500,
     include_items: true,
   })
   const { projects: meraProjects, loading: meraProjectsLoading } = useMeraProjects({ enabled: dataSource === "mera" })
@@ -366,7 +368,14 @@ export default function ReviewPage() {
       }
       await meraRefetch()
       return true
-    } catch {
+    } catch (err) {
+      const e = err as { isVersionConflict?: boolean }
+      if (e.isVersionConflict) {
+        toast({
+          title: "Trạng thái đơn trên mera đã thay đổi",
+          variant: "destructive",
+        })
+      }
       return false
     }
   }

@@ -30,6 +30,7 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const commentsEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isSubmittingRef = useRef(false)
 
   useEffect(() => {
     setIsExpanded(false)
@@ -118,20 +119,26 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!commentText.trim() || !user) return
+    if (!commentText.trim() || !user || isSubmittingRef.current) return
 
-    const success = await postComment({
-      comment_text: commentText.trim(),
-      user_name: user.name,
-      user_email: user.email,
-      user_avatar: user.avatar_url || null,
-    })
+    isSubmittingRef.current = true
+    try {
+      const success = await postComment({
+        comment_text: commentText.trim(),
+        user_name: user.name,
+        user_email: user.email,
+        user_avatar: user.avatar_url || null,
+      })
 
-    if (success) {
-      setCommentText("")
-      if (!isExpanded) {
-        setIsExpanded(true)
+      if (success) {
+        setCommentText("")
+        if (!isExpanded) {
+          setIsExpanded(true)
+        }
+        setTimeout(() => textareaRef.current?.focus(), 0)
       }
+    } finally {
+      isSubmittingRef.current = false
     }
   }
 
@@ -302,7 +309,7 @@ export function OrderComments({ itemId }: OrderCommentsProps) {
                 }
                 rows={3}
                 className="text-xs border-gray-200 focus:border-blue-300 focus:ring-blue-200 resize-none"
-                disabled={submitting || !user || uploadingImage}
+                disabled={!user || uploadingImage}
               />
             </form>
           </>
