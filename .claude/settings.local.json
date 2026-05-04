@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep *)",
+      "Bash(npx tsc *)",
+      "Bash(git stash *)",
+      "Bash(npx vercel *)",
+      "Bash(git rm *)",
+      "Bash(git commit -m ' *)",
+      "Bash(Remove-Item -Recurse -Force \"D:\\\\Pamo\\\\checkflow\\\\.next\" -ErrorAction SilentlyContinue)",
+      "Bash(Write-Output \"Done\")",
+      "Bash(pnpm build *)"
+    ]
+  }
+}

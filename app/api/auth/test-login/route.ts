@@ -10,13 +10,37 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createServerClient()
 
-    const mockUserId = "00000000-0000-0000-0000-000000000001"
-    const mockUserEmail = "testuser@example.com"
-    const mockUserName = "Test User"
-    const mockUserRole = "user"
-    const mockUserAvatar = "/placeholder.svg?height=80&width=80"
+    // Allow overriding email via request body for real-user testing
+    let bodyEmail: string | undefined
+    try {
+      const body = await request.json()
+      bodyEmail = body?.email
+    } catch {
+      // no body or invalid JSON – use defaults
+    }
 
-    // Check if mock user exists in DB, create if not, update if so
+    const targetEmail = bodyEmail || "cuonglm@pamoteam.com"
+
+    // Try to find existing user by email first
+    const { data: existingByEmail, error: fetchByEmailError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", targetEmail)
+      .limit(1)
+
+    if (fetchByEmailError) {
+      logServerError(fetchByEmailError, { context: "Test login - fetch user by email", email: targetEmail })
+      return NextResponse.json({ error: "Database Error", message: fetchByEmailError.message }, { status: 500 })
+    }
+
+    // If user exists in DB, use their real data; otherwise fall back to mock
+    const mockUserId = existingByEmail?.[0]?.id || "00000000-0000-0000-0000-000000000001"
+    const mockUserEmail = targetEmail
+    const mockUserName = existingByEmail?.[0]?.name || targetEmail.split("@")[0]
+    const mockUserRole = existingByEmail?.[0]?.role || "user"
+    const mockUserAvatar = existingByEmail?.[0]?.avatar_url || "/placeholder.svg?height=80&width=80"
+
+    // Check if user exists in DB by ID
     const { data: existingMockUsers, error: fetchMockError } = await supabase
       .from("users")
       .select("*")

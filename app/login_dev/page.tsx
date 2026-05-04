@@ -34,9 +34,11 @@ export default function LoginDevPage() {
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [isTestSigningIn, setIsTestSigningIn] = useState(false)
   const [redirectUrlCopied, setRedirectUrlCopied] = useState(false)
+  const [redirectUrl, setRedirectUrl] = useState("")
 
-  // Get the redirect URL for Google Console
-  const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/api/auth/callback` : ""
+  useEffect(() => {
+    setRedirectUrl(`${window.location.origin}/api/auth/callback`)
+  }, [])
 
   useEffect(() => {
     if (user) {

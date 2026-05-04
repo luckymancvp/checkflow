@@ -2,9 +2,10 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
-export async function GET(request: NextRequest, { params }: { params: { productType: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ productType: string }> }) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
+    const { productType: rawProductType } = await params
     const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       cookies: {
         get(name: string) {
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { productT
       },
     })
 
-    const productType = decodeURIComponent(params.productType)
+    const productType = decodeURIComponent(rawProductType)
 
     const { data, error } = await supabase
       .from("product_type_notes")
@@ -22,7 +23,6 @@ export async function GET(request: NextRequest, { params }: { params: { productT
       .single()
 
     if (error && error.code !== "PGRST116") {
-      console.error("Error fetching product type note:", error)
       return NextResponse.json({ success: false, error: "Failed to fetch product type note" }, { status: 500 })
     }
 
@@ -31,14 +31,14 @@ export async function GET(request: NextRequest, { params }: { params: { productT
       data: data || null,
     })
   } catch (error) {
-    console.error("Error in GET /api/product-type-notes/[productType]:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { productType: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ productType: string }> }) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
+    const { productType: rawProductType } = await params
     const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       cookies: {
         get(name: string) {
@@ -47,10 +47,9 @@ export async function POST(request: NextRequest, { params }: { params: { product
       },
     })
 
-    const productType = decodeURIComponent(params.productType)
+    const productType = decodeURIComponent(rawProductType)
     const { content } = await request.json()
 
-    // Check if note already exists
     const { data: existingNote } = await supabase
       .from("product_type_notes")
       .select("id")
@@ -59,7 +58,6 @@ export async function POST(request: NextRequest, { params }: { params: { product
 
     let result
     if (existingNote) {
-      // Update existing note
       result = await supabase
         .from("product_type_notes")
         .update({
@@ -70,7 +68,6 @@ export async function POST(request: NextRequest, { params }: { params: { product
         .select()
         .single()
     } else {
-      // Create new note
       result = await supabase
         .from("product_type_notes")
         .insert({
@@ -84,7 +81,6 @@ export async function POST(request: NextRequest, { params }: { params: { product
     }
 
     if (result.error) {
-      console.error("Error saving product type note:", result.error)
       return NextResponse.json({ success: false, error: "Failed to save product type note" }, { status: 500 })
     }
 
@@ -93,7 +89,6 @@ export async function POST(request: NextRequest, { params }: { params: { product
       data: result.data,
     })
   } catch (error) {
-    console.error("Error in POST /api/product-type-notes/[productType]:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }
