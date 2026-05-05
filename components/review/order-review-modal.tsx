@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ALL_STATUSES } from "@/constants/statuses"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
@@ -79,6 +80,8 @@ export function OrderReviewModal({
   const [dragStartPan, setDragStartPan] = useState({ x: 0, y: 0 })
   const [screenshotTaken, setScreenshotTaken] = useState(false)
   const [currentStatus, setCurrentStatus] = useState<Order["status"]>(order.status)
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false)
+  const [statusSearch, setStatusSearch] = useState("")
   const [columnWidths, setColumnWidths] = useState(DEFAULT_WIDTHS)
   const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null)
   const [startX, setStartX] = useState(0)
@@ -750,24 +753,41 @@ export function OrderReviewModal({
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <Select value={currentStatus} onValueChange={handleStatusChange}>
-                <SelectTrigger className="h-7 w-auto min-w-[120px] border-0 bg-transparent p-0 focus:ring-0">
-                  <div className="flex items-center">
+              <Popover modal={false} open={statusPickerOpen} onOpenChange={(open) => { setStatusPickerOpen(open); if (!open) setStatusSearch("") }}>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-1 rounded hover:bg-gray-100 px-1 py-0.5 transition-colors">
                     {getStatusBadge(currentStatus)}
-                    <ChevronDown className="h-3 w-3 ml-1 text-gray-400" />
+                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-56 p-0">
+                  <div className="p-2 border-b">
+                    <input
+                      autoFocus
+                      placeholder="Tìm status..."
+                      value={statusSearch}
+                      onChange={(e) => setStatusSearch(e.target.value)}
+                      className="w-full text-sm px-2 py-1 rounded border border-gray-200 outline-none focus:border-blue-400"
+                    />
                   </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {[...availableStatuses, "WAITING CUSTOMER", "REPAIRED"]
-                    .filter((status, index, arr) => arr.indexOf(status) === index)
-                    .sort()
-                    .map((status) => (
-                      <SelectItem key={status} value={status}>
-                        <div className="flex items-center gap-2">{getStatusBadge(status as Order["status"])}</div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                  <div className="max-h-64 overflow-y-auto py-1" onWheel={(e) => e.stopPropagation()}>
+                    {ALL_STATUSES
+                      .filter((s) => s.toLowerCase().includes(statusSearch.toLowerCase()))
+                      .map((status) => (
+                        <button
+                          key={status}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-left"
+                          onClick={() => { handleStatusChange(status); setStatusPickerOpen(false); setStatusSearch("") }}
+                        >
+                          {getStatusBadge(status)}
+                        </button>
+                      ))}
+                    {ALL_STATUSES.filter((s) => s.toLowerCase().includes(statusSearch.toLowerCase())).length === 0 && (
+                      <p className="text-xs text-gray-400 px-3 py-2">Không tìm thấy</p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <span className="text-sm text-gray-500">
               {currentIndex + 1}/{totalCount}
