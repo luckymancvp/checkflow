@@ -1,7 +1,9 @@
+export type { OrderStatus } from "@/constants/statuses"
+
 export interface Order {
   itemId: string
   sheetId: string
-  status: "DESIGNED" | "NEED_REPAIR" | "CONFIRMED" | "REPAIRED"
+  status: string
   orderNote?: string
   designer?: string
   designLink?: string

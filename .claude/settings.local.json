@@ -9,7 +9,11 @@
       "Bash(git commit -m ' *)",
       "Bash(Remove-Item -Recurse -Force \"D:\\\\Pamo\\\\checkflow\\\\.next\" -ErrorAction SilentlyContinue)",
       "Bash(Write-Output \"Done\")",
-      "Bash(pnpm build *)"
+      "Bash(pnpm build *)",
+      "Bash(git fetch *)",
+      "Bash(gh pr *)",
+      "PowerShell(gh pr list --state all --limit 5)",
+      "Bash(git remote *)"
     ]
   }
 }
