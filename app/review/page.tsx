@@ -22,7 +22,8 @@ type DataSource = "sheets" | "mera"
 
 // Reverse map: CheckFlow status → Mera status for item PATCH
 const CHECKFLOW_TO_MERA_STATUS: Record<string, string> = {
-  DESIGNED: "DESIGNING",
+  DESIGNED: "DESIGNED",
+  DESIGNING: "DESIGNING",
   CONFIRMED: "CONFIRMED",
   NEED_REPAIR: "NEED_REPAIR",
   REPAIRED: "REPAIRED",
@@ -138,8 +139,33 @@ export default function ReviewPage() {
     reloadOrderFromSheet, // Import the new reload function
   } = useOrderData({ enabled: dataSource === "sheets" })
 
+  const filteredMeraOrders = useMemo(() => {
+    if (dataSource !== "mera") return meraOrders
+    return meraOrders.filter((order) => {
+      if (filters.status?.length && !filters.status.includes(order.status)) return false
+      if (filters.designer?.length) {
+        const hasBlank = filters.designer.includes("[Blank]")
+        const others = filters.designer.filter((d) => d !== "[Blank]")
+        const isBlank = !order.designer || order.designer.trim() === ""
+        if (isBlank && !hasBlank) return false
+        if (!isBlank && !others.includes(order.designer!)) return false
+      }
+      if (filters.productType?.length && !filters.productType.includes(order.productType!)) return false
+      if (filters.store?.length && !filters.store.includes(order.store!)) return false
+      if (filters.searchQuery) {
+        const q = filters.searchQuery.toLowerCase()
+        const text = [order.itemId, order.orderNote, order.personalization, order.productName, order.designer, order.store]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+        if (!text.includes(q)) return false
+      }
+      return true
+    })
+  }, [meraOrders, filters, dataSource])
+
   // Active orders depending on source
-  const activeOrders = dataSource === "mera" ? meraOrders : orders
+  const activeOrders = dataSource === "mera" ? filteredMeraOrders : orders
   const activeLoading = dataSource === "mera" ? meraLoading : loading
   const activeError = dataSource === "mera" ? meraError : error
 
@@ -355,7 +381,8 @@ export default function ReviewPage() {
     const meraOrder = order._mera
     if (!meraOrder) return false
 
-    const item = meraOrder.items?.[0]
+    // For split-item orders, find the specific item matching this CheckFlow entry
+    const item = meraOrder.items?.find((i) => i.item_key === order.itemId) ?? meraOrder.items?.[0]
     if (!item) return false
 
     try {
@@ -710,7 +737,7 @@ export default function ReviewPage() {
         {dataSource === "mera" && (
           <OrderListHeader
             totalCount={meraTotal}
-            filteredCount={meraOrders.length}
+            filteredCount={filteredMeraOrders.length}
             filters={filters}
             onFiltersChange={applyFilters}
             onStartSequentialReview={handleStartSequentialReview}
