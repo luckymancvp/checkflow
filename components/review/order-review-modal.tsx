@@ -373,7 +373,7 @@ export function OrderReviewModal({
     if (!isProduction) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLTextAreaElement) return
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return
 
       switch (e.key) {
         case "1":
