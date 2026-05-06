@@ -48,8 +48,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Normalize status for DB storage (UI uses "NEED REPAIR", DB stores "NEED_REPAIR")
+    const dbStatus = status === "NEED REPAIR" ? "NEED_REPAIR" : status
+
     // Validate change type for NEED_REPAIR status
-    if (status === "NEED_REPAIR" && !changeType) {
+    if (dbStatus === "NEED_REPAIR" && !changeType) {
       return NextResponse.json(
         {
           success: false,
@@ -131,7 +134,7 @@ export async function POST(request: NextRequest) {
         {
           item_id: itemId,
           google_sheet_id: googleSheetId,
-          status,
+          status: dbStatus,
           order_note: orderNote,
           designer,
           design_link: designLink,
