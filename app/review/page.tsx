@@ -25,7 +25,8 @@ const CHECKFLOW_TO_MERA_STATUS: Record<string, string> = {
   DESIGNED: "DESIGNED",
   DESIGNING: "DESIGNING",
   CONFIRMED: "CONFIRMED",
-  NEED_REPAIR: "NEED_REPAIR",
+  "NEED REPAIR": "NEED REPAIR",
+  NEED_REPAIR: "NEED REPAIR",
   REPAIRED: "REPAIRED",
 }
 
@@ -550,7 +551,7 @@ export default function ReviewPage() {
       if (!success) return
     } else if (action === "need_repair") {
       if (!repairType) return
-      const targetStatus: Order["status"] = "NEED_REPAIR"
+      const targetStatus: Order["status"] = "NEED REPAIR"
       const success = dataSource === "mera"
         ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note)
         : await updateOrderStatus(currentOrder, targetStatus, note, repairType)

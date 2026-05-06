@@ -101,7 +101,7 @@ export function OrderDetailsPanel({
             Designed
           </Badge>
         )
-      case "NEED_REPAIR":
+      case "NEED REPAIR":
         return (
           <Badge className="bg-red-50 text-red-700 border-red-200">
             <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
@@ -243,7 +243,7 @@ export function OrderDetailsPanel({
           productType: order.productType,
           productName: order.productName,
           changeType:
-            order.status === "NEED_REPAIR" ? (order._changes ? "design_error" : "customer_change") : undefined,
+            order.status === "NEED REPAIR" ? (order._changes ? "design_error" : "customer_change") : undefined,
         }),
       })
 

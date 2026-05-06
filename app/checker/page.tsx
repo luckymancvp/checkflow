@@ -180,6 +180,7 @@ export default function CheckerPage() {
             Designed
           </Badge>
         )
+      case "NEED REPAIR":
       case "NEED_REPAIR":
         return (
           <Badge className="bg-red-50 text-red-700 border-red-200">
@@ -538,7 +539,7 @@ export default function CheckerPage() {
                           {reviewer.byStatus.CONFIRMED || 0}
                         </TableCell>
                         <TableCell className="text-right font-semibold text-red-700 bg-red-50">
-                          {reviewer.byStatus.NEED_REPAIR || 0}
+                          {(reviewer.byStatus["NEED REPAIR"] || reviewer.byStatus.NEED_REPAIR) || 0}
                         </TableCell>
                         <TableCell className="text-right font-semibold text-orange-700 bg-orange-50">
                           {reviewer.byChangeType.design_error}

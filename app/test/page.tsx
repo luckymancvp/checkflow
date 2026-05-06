@@ -49,7 +49,7 @@ export default function TestPage() {
       NEW: "outline",
       DESIGNED: "default",
       CONFIRMED: "secondary",
-      NEED_REPAIR: "destructive",
+      "NEED REPAIR": "destructive",
       REPAIRED: "secondary",
     }
     return <Badge variant={variants[status] || "outline"}>{status}</Badge>

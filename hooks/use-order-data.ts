@@ -136,7 +136,7 @@ export function useOrderData(options?: { enabled?: boolean }) {
       // Update status
       const statusColumnLetter = String.fromCharCode(65 + statusColumnIndex)
       const statusCellRange = `${sheet.tab_name}!${statusColumnLetter}${order.rowPosition}`
-      const sheetStatus = newStatus === "NEED_REPAIR" ? "NEED REPAIR" : newStatus
+      const sheetStatus = newStatus
 
       updates.push({
         range: statusCellRange,
@@ -208,7 +208,7 @@ export function useOrderData(options?: { enabled?: boolean }) {
         // Add status update
         const statusColumnLetter = String.fromCharCode(65 + statusColumnIndex)
         const statusCellRange = `${sheet.tab_name}!${statusColumnLetter}${order.rowPosition}`
-        const sheetStatus = newStatus === "NEED_REPAIR" ? "NEED REPAIR" : newStatus
+        const sheetStatus = newStatus
 
         updates.push({
           range: statusCellRange,
@@ -359,7 +359,8 @@ export function useOrderData(options?: { enabled?: boolean }) {
     const statusMap: Record<string, Order["status"]> = {
       // Standard statuses
       DESIGNED: "DESIGNED",
-      NEED_REPAIR: "NEED_REPAIR",
+      NEED_REPAIR: "NEED REPAIR",
+      "NEED REPAIR": "NEED REPAIR",
       CONFIRMED: "CONFIRMED",
       DESIGNING: "DESIGNING",
     }
@@ -930,8 +931,8 @@ export function useOrderData(options?: { enabled?: boolean }) {
       changeType?: "design_error" | "customer_change",
     ): Promise<boolean> => {
       try {
-        if (newStatus === "NEED_REPAIR" && !changeType) {
-          console.error("[v0] Change type required for NEED_REPAIR status")
+        if (newStatus === "NEED REPAIR" && !changeType) {
+          console.error("[v0] Change type required for NEED REPAIR status")
           return false
         }
 

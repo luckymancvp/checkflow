@@ -34,7 +34,7 @@ export function OrderListItem({ order }: OrderListItemProps) {
             Designed
           </Badge>
         )
-      case "NEED_REPAIR":
+      case "NEED REPAIR":
         return (
           <Badge className="bg-red-50 text-red-700 border-red-200 hover:bg-red-50 font-medium">
             <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>

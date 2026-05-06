@@ -292,7 +292,7 @@ export function OrderReviewModal({
             Designed
           </Badge>
         )
-      case "NEED_REPAIR":
+      case "NEED REPAIR":
         return (
           <Badge className="bg-red-50 text-red-700 border-red-200">
             <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
@@ -471,7 +471,7 @@ export function OrderReviewModal({
 
     setCurrentStatus(typedStatus)
 
-    if (typedStatus === "NEED_REPAIR") {
+    if (typedStatus === "NEED REPAIR") {
       // Show modal to select change type
       // setSelectedNewStatus(typedStatus)
       // setStatusChangeNote(order.orderNote || "")
