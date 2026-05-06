@@ -6,7 +6,8 @@ import type { MeraOrder, MeraOrderItem } from "@/types/mera-order"
 const STATUS_MAP: Record<string, Order["status"]> = {
   DESIGNING: "DESIGNING",
   CONFIRMED: "CONFIRMED",
-  NEED_REPAIR: "NEED_REPAIR",
+  NEED_REPAIR: "NEED REPAIR",
+  "NEED REPAIR": "NEED REPAIR",
   REPAIRED: "REPAIRED",
   DESIGNED: "DESIGNED",
 }
