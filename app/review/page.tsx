@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
+import { GoogleDriveClient } from "@/lib/google-drive-client"
 import { RefreshCw, Database, Sheet } from "lucide-react"
 
 type DataSource = "sheets" | "mera"
@@ -95,23 +96,6 @@ export default function ReviewPage() {
     return counts
   }, [dataSource, meraOrders, meraStatusCounts])
 
-  const meraDerivedFilteredCounts = useMemo(() => {
-    const designerCounts: Record<string, number> = {}
-    const productTypeCounts: Record<string, number> = {}
-    const storeCounts: Record<string, number> = {}
-    if (dataSource !== "mera") return { designerCounts, productTypeCounts, storeCounts }
-    meraOrders.forEach((o) => {
-      if (o.designer && o.designer.trim() !== "") {
-        designerCounts[o.designer] = (designerCounts[o.designer] || 0) + 1
-      } else {
-        designerCounts["[Blank]"] = (designerCounts["[Blank]"] || 0) + 1
-      }
-      if (o.productType) productTypeCounts[o.productType] = (productTypeCounts[o.productType] || 0) + 1
-      if (o.store) storeCounts[o.store] = (storeCounts[o.store] || 0) + 1
-    })
-    return { designerCounts, productTypeCounts, storeCounts }
-  }, [dataSource, meraOrders])
-
   // ── Sheets state ──────────────────────────────────────────────────────────
   const {
     orders,
@@ -139,6 +123,51 @@ export default function ReviewPage() {
     updateOrderStatus,
     reloadOrderFromSheet, // Import the new reload function
   } = useOrderData({ enabled: dataSource === "sheets" })
+
+  const meraDerivedFilteredCounts = useMemo(() => {
+    const designerCounts: Record<string, number> = {}
+    const productTypeCounts: Record<string, number> = {}
+    const storeCounts: Record<string, number> = {}
+    if (dataSource !== "mera") return { designerCounts, productTypeCounts, storeCounts }
+
+    const matchesDesigner = (o: Order) => {
+      if (!filters.designer?.length) return true
+      const hasBlank = filters.designer.includes("[Blank]")
+      const others = filters.designer.filter((d) => d !== "[Blank]")
+      const isBlank = !o.designer || o.designer.trim() === ""
+      return isBlank ? hasBlank : others.includes(o.designer!)
+    }
+
+    // Designer counts: apply status + productType + store filters (NOT designer)
+    meraOrders.forEach((o) => {
+      if (filters.status?.length && !filters.status.includes(o.status)) return
+      if (filters.productType?.length && !filters.productType.includes(o.productType!)) return
+      if (filters.store?.length && !filters.store.includes(o.store!)) return
+      if (o.designer && o.designer.trim() !== "") {
+        designerCounts[o.designer] = (designerCounts[o.designer] || 0) + 1
+      } else {
+        designerCounts["[Blank]"] = (designerCounts["[Blank]"] || 0) + 1
+      }
+    })
+
+    // Product type counts: apply status + designer + store filters (NOT productType)
+    meraOrders.forEach((o) => {
+      if (filters.status?.length && !filters.status.includes(o.status)) return
+      if (!matchesDesigner(o)) return
+      if (filters.store?.length && !filters.store.includes(o.store!)) return
+      if (o.productType) productTypeCounts[o.productType] = (productTypeCounts[o.productType] || 0) + 1
+    })
+
+    // Store counts: apply status + designer + productType filters (NOT store)
+    meraOrders.forEach((o) => {
+      if (filters.status?.length && !filters.status.includes(o.status)) return
+      if (!matchesDesigner(o)) return
+      if (filters.productType?.length && !filters.productType.includes(o.productType!)) return
+      if (o.store) storeCounts[o.store] = (storeCounts[o.store] || 0) + 1
+    })
+
+    return { designerCounts, productTypeCounts, storeCounts }
+  }, [dataSource, meraOrders, filters])
 
   const filteredMeraOrders = useMemo(() => {
     if (dataSource !== "mera") return meraOrders
@@ -361,6 +390,16 @@ export default function ReviewPage() {
     } finally {
       setIsLoadingNewSheet(false)
     }
+  }
+
+  const handleMeraRefresh = () => {
+    GoogleDriveClient.clearCache()
+    meraRefetch()
+  }
+
+  const handleSheetsRefresh = async () => {
+    GoogleDriveClient.clearCache()
+    await refreshData()
   }
 
   const handleStartSequentialReview = () => {
@@ -689,7 +728,7 @@ export default function ReviewPage() {
             selectedSheet={selectedSheet}
             loading={loading}
             onSheetSelect={handleSheetSelect}
-            onRefresh={refreshData}
+            onRefresh={handleSheetsRefresh}
             lastSync={lastSync}
             syncStatus={syncStatus}
             pendingChanges={pendingChanges}
@@ -723,7 +762,7 @@ export default function ReviewPage() {
                 </select>
               )}
               <button
-                onClick={() => meraRefetch()}
+                onClick={handleMeraRefresh}
                 className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50"
               >
                 <RefreshCw className={`h-4 w-4 ${meraLoading ? "animate-spin" : ""}`} />
@@ -755,7 +794,7 @@ export default function ReviewPage() {
             designerCounts={meraDerivedFilteredCounts.designerCounts}
             productTypeCounts={meraDerivedFilteredCounts.productTypeCounts}
             storeCounts={meraDerivedFilteredCounts.storeCounts}
-            onRefresh={meraRefetch}
+            onRefresh={handleMeraRefresh}
           />
         )}
 
@@ -781,7 +820,7 @@ export default function ReviewPage() {
             syncError={syncError}
             onManualSync={triggerManualSync}
             lastSync={lastSync}
-            onRefresh={refreshData}
+            onRefresh={handleSheetsRefresh}
           />
         )}
 
