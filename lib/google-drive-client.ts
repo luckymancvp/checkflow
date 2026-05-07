@@ -106,6 +106,20 @@ class GoogleDriveClient {
     GoogleDriveClient.blobCache.clear()
     GoogleDriveClient.fetchCache.clear()
   }
+
+  static clearFileCache(url: string) {
+    const patterns = [/\/file\/d\/([a-zA-Z0-9_-]+)/, /[?&]id=([a-zA-Z0-9_-]+)/, /\/d\/([a-zA-Z0-9_-]+)/]
+    let fileId: string | null = null
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match?.[1]) { fileId = match[1]; break }
+    }
+    if (!fileId) return
+    const blobUrl = GoogleDriveClient.blobCache.get(fileId)
+    if (blobUrl) URL.revokeObjectURL(blobUrl)
+    GoogleDriveClient.blobCache.delete(fileId)
+    GoogleDriveClient.fetchCache.delete(fileId)
+  }
 }
 
 export { GoogleDriveClient }
