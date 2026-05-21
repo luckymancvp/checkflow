@@ -16,6 +16,12 @@ export interface UserPresence {
   last_activity: string
 }
 
+// Sanitize itemId to ensure it's safe as an Ably channel name segment.
+// Ably reserves *, ?, [, ] for wildcard patterns and may reject other special chars.
+function toChannelSafeId(itemId: string): string {
+  return itemId.replace(/[^a-zA-Z0-9\-_.]/g, "_")
+}
+
 export function useOrderReviewPresence(itemId: string, enabled = true) {
   const [reviewingUsers, setReviewingUsers] = useState<UserPresence[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,7 +32,7 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
       if (!user || !enabled) return
 
       const ably = getAblyBrowserClient()
-      const channel = ably.channels.get(`order-review-presence:${itemId}`)
+      const channel = ably.channels.get(`order-review-presence:${toChannelSafeId(itemId)}`)
 
       try {
         await channel.presence.update({
@@ -52,7 +58,7 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
     }
 
     const ably = getAblyBrowserClient()
-    const channel = ably.channels.get(`order-review-presence:${itemId}`)
+    const channel = ably.channels.get(`order-review-presence:${toChannelSafeId(itemId)}`)
 
     const enterPresence = async () => {
       try {

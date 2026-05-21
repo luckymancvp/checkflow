@@ -416,7 +416,7 @@ export default function ReviewPage() {
   const handleMeraStatusUpdate = async (
     order: Order & { _mera?: MeraOrder },
     newStatus: Order["status"],
-    note?: string,
+    _note?: string,
   ): Promise<boolean> => {
     const meraOrder = order._mera
     if (!meraOrder) return false
@@ -425,26 +425,56 @@ export default function ReviewPage() {
     const item = meraOrder.items?.find((i) => i.item_key === order.itemId) ?? meraOrder.items?.[0]
     if (!item) return false
 
-    try {
-      await meraPatchItem(item.item_key, {
-        version: item.version,
-        status: CHECKFLOW_TO_MERA_STATUS[newStatus] ?? newStatus,
+    const meraStatus = CHECKFLOW_TO_MERA_STATUS[newStatus] ?? newStatus
+
+    const applySuccess = (updatedItem: { item_key: string; version: number }) => {
+      setReviewMode((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          orders: prev.orders.map((o) => {
+            if (o.itemId !== order.itemId) return o
+            const mera = (o as Order & { _mera?: MeraOrder })._mera
+            if (!mera) return o
+            return {
+              ...o,
+              status: newStatus,
+              _mera: {
+                ...mera,
+                items: mera.items?.map((i) =>
+                  i.item_key === updatedItem.item_key ? { ...i, version: updatedItem.version } : i
+                ),
+              },
+            }
+          }),
+        }
       })
-      if (note !== undefined && note !== meraOrder.note) {
-        // note lives on the order level — would need patchOrder; skip for now
-      }
-      await meraRefetch()
-      return true
-    } catch (err) {
-      const e = err as { isVersionConflict?: boolean }
-      if (e.isVersionConflict) {
-        toast({
-          title: "Trạng thái đơn trên mera đã thay đổi",
-          variant: "destructive",
-        })
-      }
-      return false
+      meraRefetch()
     }
+
+    // Retry loop: mỗi lần 409 lấy version mới từ response và thử lại (tối đa 3 lần)
+    let version = item.version
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const updatedItem = await meraPatchItem(item.item_key, { version, status: meraStatus })
+        applySuccess(updatedItem)
+        return true
+      } catch (err) {
+        const e = err as { isVersionConflict?: boolean; latest?: { item_key: string; version: number } }
+        if (e.isVersionConflict && e.latest) {
+          version = e.latest.version
+          continue
+        }
+        break
+      }
+    }
+
+    toast({
+      title: "Không thể cập nhật trạng thái",
+      description: "Đơn đang được chỉnh sửa đồng thời. Vui lòng thử lại.",
+      variant: "destructive",
+    })
+    return false
   }
 
   const handleReviewClose = () => {
@@ -457,10 +487,24 @@ export default function ReviewPage() {
     const nextIndex = reviewMode.currentIndex + 1
     const nextOrder = reviewMode.orders[nextIndex]
 
-    setReviewMode({
-      ...reviewMode,
-      currentIndex: nextIndex,
-    })
+    if (dataSource === "mera") {
+      // Dùng functional form để không ghi đè update version từ handleMeraStatusUpdate
+      // Đồng thời sync version mới nhất từ activeOrders (đã được meraRefetch cập nhật)
+      const latestOrder = activeOrders.find((o) => o.itemId === nextOrder.itemId)
+      setReviewMode((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          currentIndex: nextIndex,
+          orders: latestOrder
+            ? prev.orders.map((o, i) => (i === nextIndex ? latestOrder : o))
+            : prev.orders,
+        }
+      })
+      return
+    }
+
+    setReviewMode((prev) => prev ? { ...prev, currentIndex: nextIndex } : prev)
 
     console.log(`[v0] Moving to next order ${nextOrder.itemId}, reloading data from sheet`)
     setIsJumpLoading(true)
@@ -498,10 +542,22 @@ export default function ReviewPage() {
     const prevIndex = reviewMode.currentIndex - 1
     const prevOrder = reviewMode.orders[prevIndex]
 
-    setReviewMode({
-      ...reviewMode,
-      currentIndex: prevIndex,
-    })
+    if (dataSource === "mera") {
+      const latestOrder = activeOrders.find((o) => o.itemId === prevOrder.itemId)
+      setReviewMode((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          currentIndex: prevIndex,
+          orders: latestOrder
+            ? prev.orders.map((o, i) => (i === prevIndex ? latestOrder : o))
+            : prev.orders,
+        }
+      })
+      return
+    }
+
+    setReviewMode((prev) => prev ? { ...prev, currentIndex: prevIndex } : prev)
 
     console.log(`[v0] Moving to previous order ${prevOrder.itemId}, reloading data from sheet`)
     setIsJumpLoading(true)
@@ -538,10 +594,22 @@ export default function ReviewPage() {
 
     const targetOrder = reviewMode.orders[index]
 
-    setReviewMode({
-      ...reviewMode,
-      currentIndex: index,
-    })
+    if (dataSource === "mera") {
+      const latestOrder = activeOrders.find((o) => o.itemId === targetOrder.itemId)
+      setReviewMode((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          currentIndex: index,
+          orders: latestOrder
+            ? prev.orders.map((o, i) => (i === index ? latestOrder : o))
+            : prev.orders,
+        }
+      })
+      return
+    }
+
+    setReviewMode((prev) => prev ? { ...prev, currentIndex: index } : prev)
 
     console.log(`[v0] Jumping to order ${targetOrder.itemId}, reloading data from sheet`)
     setIsJumpLoading(true)
@@ -582,18 +650,44 @@ export default function ReviewPage() {
 
     const currentOrder = reviewMode.orders[reviewMode.currentIndex]
 
+    if (dataSource === "mera") {
+      // Mera: navigate ngay lập tức, PATCH chạy ngầm
+      if (action === "confirm") {
+        const targetStatus: Order["status"] = "CONFIRMED"
+        if (reviewMode.currentIndex < reviewMode.orders.length - 1) {
+          handleReviewNext()
+        } else {
+          setReviewMode(null)
+        }
+        handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note)
+      } else if (action === "need_repair") {
+        if (!repairType) return
+        const targetStatus: Order["status"] = "NEED REPAIR"
+        if (reviewMode.currentIndex < reviewMode.orders.length - 1) {
+          handleReviewNext()
+        } else {
+          setReviewMode(null)
+        }
+        handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note)
+      } else if (action === "skip") {
+        if (reviewMode.currentIndex < reviewMode.orders.length - 1) {
+          handleReviewNext()
+        } else {
+          setReviewMode(null)
+        }
+      }
+      return
+    }
+
+    // Sheets: giữ nguyên behavior (await trước khi navigate)
     if (action === "confirm") {
       const targetStatus: Order["status"] = "CONFIRMED"
-      const success = dataSource === "mera"
-        ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note)
-        : await updateOrderStatus(currentOrder, targetStatus, note)
+      const success = await updateOrderStatus(currentOrder, targetStatus, note)
       if (!success) return
     } else if (action === "need_repair") {
       if (!repairType) return
       const targetStatus: Order["status"] = "NEED REPAIR"
-      const success = dataSource === "mera"
-        ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note)
-        : await updateOrderStatus(currentOrder, targetStatus, note, repairType)
+      const success = await updateOrderStatus(currentOrder, targetStatus, note, repairType)
       if (!success) return
     }
 
