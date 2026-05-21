@@ -54,7 +54,6 @@ export function useMeraMutations() {
         if (result.ok) return result.data
 
         if (result.status === 409) {
-          toast({ title: "Trạng thái đơn trên mera đã thay đổi", variant: "destructive" })
           const err: VersionConflictError = {
             isVersionConflict: true,
             latest: (result.payload as { latest: MeraOrder }).latest,
@@ -87,7 +86,6 @@ export function useMeraMutations() {
         if (result.ok) return result.data
 
         if (result.status === 409) {
-          toast({ title: "Trạng thái đơn trên mera đã thay đổi", variant: "destructive" })
           const err: VersionConflictError = {
             isVersionConflict: true,
             latest: (result.payload as { latest: MeraOrderItem }).latest,
