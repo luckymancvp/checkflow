@@ -29,20 +29,23 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const storedUser = localStorage.getItem("app-user")
-        return storedUser ? JSON.parse(storedUser) : null
-      } catch (e) {
-        console.error("Failed to parse stored user from localStorage", e)
-        return null
-      }
-    }
-    return null
-  })
-  const [loading, setLoading] = useState(false)
+  // Không đọc localStorage trong initializer vì sẽ gây hydration mismatch
+  // (SSR luôn ra null, client ra user → HTML khác nhau). Rehydrate trong useEffect bên dưới.
+  const [user, setUser] = useState<AppUser | null>(null)
+  // Bắt đầu với loading=true để SSR và client first render đều cho ra spinner; sau khi
+  // mount + checkAuth xong mới flip về false. Tránh hydration mismatch ở AuthGuard.
+  const [loading, setLoading] = useState(true)
   const pathname = usePathname()
+
+  // Rehydrate user từ localStorage sau khi mount (chỉ chạy trên client).
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("app-user")
+      if (storedUser) setUser(JSON.parse(storedUser))
+    } catch (e) {
+      console.error("Failed to parse stored user from localStorage", e)
+    }
+  }, [])
 
   // Define public routes that don't need authentication check
   const publicRoutes = ["/login", "/login_dev", "/auth/callback", "/auth/success"]

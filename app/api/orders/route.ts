@@ -48,15 +48,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Normalize status for DB storage (UI uses "NEED REPAIR", DB stores "NEED_REPAIR")
-    const dbStatus = status === "NEED REPAIR" ? "NEED_REPAIR" : status
-
-    // Validate change type for NEED_REPAIR status
-    if (dbStatus === "NEED_REPAIR" && !changeType) {
+    // Validate change type for NEED REPAIR status
+    if (status === "NEED REPAIR" && !changeType) {
       return NextResponse.json(
         {
           success: false,
-          error: "Change type required when status is NEED_REPAIR",
+          error: "Change type required when status is NEED REPAIR",
           debug: {
             message: "changeType validation failed",
             timestamp: new Date().toISOString(),
@@ -134,7 +131,7 @@ export async function POST(request: NextRequest) {
         {
           item_id: itemId,
           google_sheet_id: googleSheetId,
-          status: dbStatus,
+          status,
           order_note: orderNote,
           designer,
           design_link: designLink,

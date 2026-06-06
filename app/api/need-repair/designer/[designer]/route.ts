@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: { designer
         updated_at,
         users!created_by(email)
       `)
-      .eq("status", "NEED_REPAIR")
+      .eq("status", "NEED REPAIR")
       .eq("designer", designer)
 
     // Apply time filtering

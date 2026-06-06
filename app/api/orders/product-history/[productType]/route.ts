@@ -52,7 +52,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       `)
       .eq("product_type", productType)
       .eq("google_sheet_id", googleSheetId)
-      .eq("status", "NEED_REPAIR")
+      .eq("status", "NEED REPAIR")
       .order("created_at", { ascending: false })
 
     if (historyError) {
