@@ -95,6 +95,8 @@ class MeraClient {
     if (params.project_id) queryParams.project_id = params.project_id
     if (params.q) queryParams.q = params.q
     if (params.include_items) queryParams.include_items = "true"
+    if (params.date_from) queryParams.date_from = params.date_from
+    if (params.date_to) queryParams.date_to = params.date_to
 
     const url = new URL(`${this.baseUrl}/api/v2/orders`)
     for (const [key, value] of Object.entries(queryParams)) {

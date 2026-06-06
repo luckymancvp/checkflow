@@ -134,14 +134,33 @@ Trả về danh sách đơn hàng phân trang, hỗ trợ filter và search.
 | `page` | int | `1` | Trang hiện tại |
 | `page_size` | int | `50` | Số dòng/trang (max 500) |
 | `channel` | string | — | Filter theo channel (`etsy`, `manual`, ...) |
-| `status` | string | — | Filter theo 1 status |
-| `statuses` | string[] | — | Filter theo nhiều status (query array: `?statuses=NEW&statuses=DESIGNING`) |
+| `status` | string | — | Filter theo 1 status (so sánh với items) |
+| `statuses` | string[] | — | Filter theo nhiều status (`?statuses=NEW&statuses=DESIGNING`) |
 | `store` | string | — | Filter theo tên store |
-| `provider` | string | — | Filter theo provider |
-| `designer` | string | — | Filter theo designer ID |
+| `provider` | string | — | Filter theo provider (so sánh với items) |
+| `designer` | string | — | Filter theo designer ID (so sánh với items) |
 | `project_id` | string | — | Filter theo project ID |
-| `q` | string | — | Full-text search (order_id, customer name/email, shipping name, store, item_key) |
+| `q` | string | — | Full-text search (order_id, customer name/email, store, item_key) |
+| `date_from` | string (`YYYY-MM-DD`) | — | Lọc đơn có `created_at >= date_from` (00:00:00 ngày đó, UTC) |
+| `date_to` | string (`YYYY-MM-DD`) | — | Lọc đơn có `created_at <= date_to` (tự động đẩy về 23:59:59 cuối ngày, UTC) |
 | `include_items` | string | `false` | Set `true` để kèm items trong mỗi order |
+
+**Ghi chú filter theo thời gian:**
+- Filter áp lên field `created_at` của order (thời điểm đơn được tạo trong hệ thống Mera, không phải `order_date` từ Etsy).
+- Định dạng bắt buộc là `YYYY-MM-DD`. Giá trị sai định dạng sẽ bị bỏ qua (không trả lỗi).
+- `date_to` được tự động cộng thêm 23h59m59s, nên `?date_from=2025-01-15&date_to=2025-01-15` sẽ trả về tất cả đơn trong ngày 15/01.
+- Có thể dùng riêng lẻ: chỉ `date_from` (từ ngày X về sau) hoặc chỉ `date_to` (từ đầu đến ngày X).
+
+**Ví dụ:**
+```bash
+# Đơn tạo trong tuần qua
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://mera-fulfill-api.pamoteam.top/api/v2/orders?date_from=2026-05-30&date_to=2026-06-06"
+
+# Kết hợp với status filter
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://mera-fulfill-api.pamoteam.top/api/v2/orders?date_from=2026-06-01&statuses=NEW&statuses=DESIGNING"
+```
 
 ### Response `200 OK`
 
@@ -149,41 +168,32 @@ Trả về danh sách đơn hàng phân trang, hỗ trợ filter và search.
 {
   "orders": [
     {
+      "id": "683abc1234567890abcdef01",
       "order_id": "DAV-3999799511",
       "channel": "etsy",
       "shop_id": "12345",
+      "etsy_account": "",
       "store": "DavShop",
-      "status": "NEW",
+      "project_id": "abc123",
       "note": "",
-      "provider": "",
-      "material": "",
-      "designer": { "id": "", "name": "" },
       "customer": { "name": "John Doe", "email": "john@example.com" },
-      "shipping": {
-        "name": "John Doe",
-        "street": "123 Main St",
-        "city": "New York",
-        "state": "NY",
-        "zip_code": "10001",
-        "country": "US"
-      },
       "pricing": {
         "currency": "USD",
         "subtotal": "25.00",
         "discount": "0.00",
         "total": "25.00"
       },
-      "source_link": "https://www.etsy.com/...",
-      "tracking": { "code": "", "carrier": "", "url": "" },
+      "vat_ioss": "",
       "export_count": 0,
-      "mockup_link": "",
-      "fulfillment_cost": "",
-      "ff_name_by_day": "",
       "is_split_items": true,
       "is_deleted": false,
+      "last_changed_fields": ["status"],
+      "last_updated_source": "ingest",
       "version": 3,
       "created_at": "2025-01-15T10:30:00Z",
       "updated_at": "2025-01-16T08:00:00Z",
+      "updated_by": "user@example.com",
+      "order_date": "2025-01-15T10:30:00Z",
       "items_count": 2,
       "total_quantity": 5,
       "items": []
@@ -234,25 +244,44 @@ GET /api/v2/orders/:order_id/items
 {
   "items": [
     {
+      "id": "683abc1234567890abcdef02",
       "item_key": "DAV-3999799511-4986531800",
       "order_id": "DAV-3999799511",
       "etsy_line_item_id": "4986531800",
+
       "status": "NEW",
-      "provider": "",
+      "provider": [],
       "material": "",
+      "designer": { "id": "", "name": "" },
+
+      "shipping": {
+        "name": "John Doe",
+        "street": "123 Main St",
+        "city": "New York",
+        "state": "NY",
+        "zip_code": "10001",
+        "country": "US"
+      },
+
       "image_link": "https://...",
-      "source_cost": "12.50",
+      "price": "12.50",
       "quantity": 1,
       "product_name": "Custom Necklace",
       "personalization": "Name: Jane",
       "product_type": "necklace",
+
       "design_link": "",
       "customer_image": "",
       "mockup_link": "",
+
       "tracking": { "code": "", "carrier": "", "url": "" },
+      "fulfillment_cost": "",
+      "ff_name_by_day": "",
+
       "version": 2,
       "created_at": "2025-01-15T10:30:00Z",
-      "updated_at": "2025-01-16T08:00:00Z"
+      "updated_at": "2025-01-16T08:00:00Z",
+      "updated_by": "user@example.com"
     }
   ]
 }
@@ -273,40 +302,29 @@ Sửa các field user-managed trên đơn hàng. Sử dụng [optimistic locking
 ```json
 {
   "version": 3,
-  "status": "DESIGNING",
   "note": "Updated from external system",
-  "provider": "ProviderA",
-  "designer": { "id": "user123", "name": "Designer Name" }
+  "store": "NewStoreName"
 }
 ```
 
 **Bắt buộc:** `version` (integer) — phải khớp version hiện tại của order.
 
-### Allowed Fields (User-Managed)
+### Allowed Fields (User-Managed Order)
 
 | Field | Type | Mô tả |
 |-------|------|-------|
 | `note` | string | Ghi chú |
-| `provider` | string | Nhà cung cấp |
-| `material` | string | Chất liệu |
 | `customer` | object | `{ "name": "...", "email": "..." }` |
-| `shipping` | object | Địa chỉ giao hàng (xem model) |
-| `pricing` | object | Giá (xem model) |
-| `tracking` | object | `{ "code": "...", "carrier": "...", "url": "..." }` |
+| `pricing` | object | `{ "currency": "...", "subtotal": "...", "discount": "...", "total": "..." }` |
 | `channel` | string | Kênh bán hàng |
 | `store` | string | Tên store |
-| `source_link` | string | Link nguồn |
 | `vat_ioss` | string | VAT/IOSS |
 | `etsy_account` | string | Tài khoản Etsy |
-| `mockup_link` | string | Link mockup |
-| `fulfillment_cost` | string | Chi phí fulfillment |
 | `export_count` | int | Số lần export |
-| `ff_name_by_day` | string | FF name by day |
 | `is_split_items` | bool | Bật/tắt split items |
 | `is_deleted` | bool | Soft delete |
-| `personalization` | string | Personalization |
 
-> **Lưu ý:** `status` và `designer` **không** được phép PATCH qua endpoint này — sẽ bị reject với `400 Bad Request`.
+> **Không được phép** PATCH qua endpoint này: `provider`, `material`, `shipping`, `tracking`, `mockup_link`, `fulfillment_cost`, `ff_name_by_day` — các field này thuộc về `order_items`, dùng [Patch Item](#5-patch-item).
 
 ### Response `200 OK`
 
@@ -317,7 +335,7 @@ Trả về order đã cập nhật (version tăng 1).
 ```json
 {
   "error": "cannot modify source-managed or system fields",
-  "rejected_fields": ["created_at", "version"]
+  "rejected_fields": ["shipping"]
 }
 ```
 
@@ -347,7 +365,15 @@ Sửa 1 item trong đơn hàng. Yêu cầu order phải bật `is_split_items = 
   "version": 2,
   "status": "DESIGNING",
   "design_link": "https://drive.google.com/...",
-  "product_type": "necklace"
+  "product_type": "necklace",
+  "shipping": {
+    "name": "Jane Doe",
+    "street": "456 New St",
+    "city": "Austin",
+    "state": "TX",
+    "zip_code": "78701",
+    "country": "US"
+  }
 }
 ```
 
@@ -358,10 +384,11 @@ Sửa 1 item trong đơn hàng. Yêu cầu order phải bật `is_split_items = 
 | `status` | string | Trạng thái item |
 | `provider` | string | Nhà cung cấp |
 | `material` | string | Chất liệu |
+| `shipping` | object | Địa chỉ giao hàng riêng của item |
 | `product_name` | string | Tên sản phẩm |
 | `quantity` | int | Số lượng |
 | `image_link` | string | Link ảnh |
-| `source_cost` | string | Giá gốc |
+| `price` | string | Giá item |
 | `product_type` | string | Loại sản phẩm |
 | `design_link` | string | Link design |
 | `customer_image` | string | Ảnh khách hàng |
@@ -369,6 +396,8 @@ Sửa 1 item trong đơn hàng. Yêu cầu order phải bật `is_split_items = 
 | `tracking` | object | `{ "code": "...", "carrier": "...", "url": "..." }` |
 | `personalization` | string | Personalization |
 | `designer` | object | `{ "id": "...", "name": "..." }` |
+| `fulfillment_cost` | string | Chi phí fulfillment |
+| `ff_name_by_day` | string | FF name by day |
 
 ### Response `200 OK`
 
@@ -459,7 +488,6 @@ Tạo đơn hàng mới (manual order).
   "order_id": "",
   "channel": "manual",
   "store": "MyStore",
-  "status": "NEW",
   "note": "Manual order",
   "customer": {
     "name": "Customer Name",
@@ -494,13 +522,14 @@ Tạo đơn hàng mới (manual order).
 - Nếu `channel` rỗng → mặc định `manual`.
 - `is_split_items` tự bật nếu có > 1 item.
 - Mỗi item nếu không có `item_key` → tự sinh `<order_id>-<random>`.
+- `shipping` trong request được copy vào tất cả items được tạo.
 
 ### Response `201 Created`
 
 ```json
 {
   "order": { /* order object */ },
-  "items": [ /* item objects */ ]
+  "items": [ /* item objects, mỗi item có shipping đã được copy */ ]
 }
 ```
 
@@ -536,8 +565,8 @@ POST /api/v2/orders/:order_id/split
 
 Bật/tắt chế độ split items cho order.
 
-- **ON (`split: true`):** Set `is_split_items = true`, copy `status/provider/material` từ order xuống items có field rỗng.
-- **OFF (`split: false`):** Set `is_split_items = false`, giữ nguyên item overrides.
+- **ON (`split: true`):** Set `is_split_items = true`. Sau đó có thể PATCH từng item riêng (status, provider, material, shipping, ...).
+- **OFF (`split: false`):** Set `is_split_items = false`. Item data không đổi, chỉ ảnh hưởng đến điều kiện cho phép PATCH item.
 
 ### Request Body
 
@@ -574,6 +603,7 @@ Tách 1 item có `quantity > 1` thành N items riêng biệt (mỗi item quantit
 
 - Số phần tử `personalizations` phải bằng `quantity` hiện tại của item.
 - Item gốc giữ nguyên `item_key`, các item mới có suffix `-1`, `-2`, ...
+- Mỗi item mới kế thừa `shipping` từ item gốc.
 
 ### Response `200 OK`
 
@@ -621,7 +651,7 @@ Trả về lịch sử thay đổi (audit trail) của 1 order.
 
 | Param | Type | Default | Mô tả |
 |-------|------|---------|-------|
-| `field` | string | — | Filter theo field cụ thể (vd: `status`) |
+| `field` | string | — | Filter theo field cụ thể (vd: `note`) |
 | `include_items` | string | `false` | Kèm audit events của items |
 | `limit` | int | `50` | Số events tối đa |
 | `cursor` | string | — | Cursor cho pagination |
@@ -638,8 +668,7 @@ Trả về lịch sử thay đổi (audit trail) của 1 order.
       "order_id": "DAV-3999799511",
       "action": "update",
       "changes": [
-        { "path": "status", "from": "NEW", "to": "DESIGNING" },
-        { "path": "designer.name", "from": "", "to": "Designer A" }
+        { "path": "note", "from": "", "to": "Rush order" }
       ],
       "actor": { "type": "user", "id": "user123", "email": "user@example.com" },
       "meta": { "source": "admin-api", "request_id": "..." },
@@ -696,7 +725,7 @@ Tổng hợp các endpoint thao tác trực tiếp trên item thông qua `item_k
 | `GET` | `/api/v2/order-items/:item_key/history` | Lịch sử thay đổi item | [§13](#13-get-item-history) |
 
 > **Lưu ý:** Hiện tại **không có** endpoint `GET /api/v2/order-items/:item_key` để lấy thông tin 1 item đơn lẻ.  
-> Để đọc thông tin item, sử dụng `GET /api/v2/orders/:order_id/items` ([§3](#3-get-order-items)) rồi filter theo `item_key` phía client, hoặc dùng `GET /api/v2/orders/:order_id?include_items=true` ([§1](#1-list-orders)).
+> Để đọc thông tin item, sử dụng `GET /api/v2/orders/:order_id/items` ([§3](#3-get-order-items)) rồi filter theo `item_key` phía client, hoặc dùng `GET /api/v2/orders/:order_id?include_items=true`.
 
 ### Ví dụ sử dụng
 
@@ -709,7 +738,8 @@ curl -X PATCH http://localhost:8080/api/v2/order-items/DAT-4019091621-5021368067
     "version": 2,
     "status": "DESIGNING",
     "design_link": "https://drive.google.com/file/d/xxx",
-    "product_type": "necklace"
+    "product_type": "necklace",
+    "tracking": { "code": "1Z999AA10123456784", "carrier": "UPS", "url": "" }
   }'
 ```
 
@@ -717,25 +747,44 @@ Response `200 OK`:
 
 ```json
 {
+  "id": "683abc1234567890abcdef02",
   "item_key": "DAT-4019091621-5021368067",
   "order_id": "DAT-4019091621",
   "etsy_line_item_id": "5021368067",
+
   "status": "DESIGNING",
-  "provider": "",
+  "provider": [],
   "material": "",
+  "designer": { "id": "", "name": "" },
+
+  "shipping": {
+    "name": "Anna Smith",
+    "street": "789 Oak Ave",
+    "city": "Portland",
+    "state": "OR",
+    "zip_code": "97201",
+    "country": "US"
+  },
+
   "image_link": "https://...",
-  "source_cost": "15.00",
+  "price": "15.00",
   "quantity": 1,
   "product_name": "Custom Pendant",
   "personalization": "Name: Anna",
   "product_type": "necklace",
+
   "design_link": "https://drive.google.com/file/d/xxx",
   "customer_image": "",
   "mockup_link": "",
-  "tracking": { "code": "", "carrier": "", "url": "" },
+
+  "tracking": { "code": "1Z999AA10123456784", "carrier": "UPS", "url": "" },
+  "fulfillment_cost": "",
+  "ff_name_by_day": "",
+
   "version": 3,
   "created_at": "2025-06-01T10:00:00Z",
-  "updated_at": "2025-06-02T14:30:00Z"
+  "updated_at": "2025-06-02T14:30:00Z",
+  "updated_by": "user@example.com"
 }
 ```
 
@@ -803,6 +852,8 @@ Từ response, tìm object có `"item_key": "DAT-4019091621-5021368067"`.
 
 ### Order
 
+`orders` collection chỉ lưu metadata đơn hàng, thông tin khách hàng, pricing, và flags. Các trường vận hành theo từng item (shipping, tracking, provider, ...) nằm ở `order_items`.
+
 ```json
 {
   "id": "MongoDB ObjectID",
@@ -813,52 +864,37 @@ Từ response, tìm object có `"item_key": "DAT-4019091621-5021368067"`.
   "store": "DavShop",
   "project_id": "abc123",
 
-  "status": "NEW",
   "note": "",
-  "provider": "",
-  "material": "",
-  "designer": { "id": "", "name": "" },
-
   "customer": { "name": "John Doe", "email": "john@example.com" },
-  "shipping": {
-    "name": "John Doe",
-    "street": "123 Main St",
-    "city": "New York",
-    "state": "NY",
-    "zip_code": "10001",
-    "country": "US"
-  },
   "pricing": {
     "currency": "USD",
     "subtotal": "25.00",
     "discount": "0.00",
     "total": "25.00"
   },
-
-  "source_link": "https://...",
   "vat_ioss": "",
+
   "export_count": 0,
-  "mockup_link": "",
-  "fulfillment_cost": "",
-  "tracking": { "code": "", "carrier": "", "url": "" },
-  "ff_name_by_day": "",
   "is_split_items": false,
 
   "is_deleted": false,
   "deleted_at": null,
   "deleted_by": "",
 
-  "last_changed_fields": ["status", "designer"],
+  "last_changed_fields": ["note"],
   "last_updated_source": "admin-api",
 
   "version": 3,
   "created_at": "2025-01-15T10:30:00Z",
   "updated_at": "2025-01-16T08:00:00Z",
-  "updated_by": "user@example.com"
+  "updated_by": "user@example.com",
+  "order_date": "2025-01-15T10:30:00Z"
 }
 ```
 
 ### OrderItem
+
+Mỗi item lưu đầy đủ thông tin vận hành, bao gồm **shipping riêng**. Khi ingest, shipping được copy từ địa chỉ giao hàng của order nguồn (Etsy). Sau đó có thể sửa shipping từng item độc lập.
 
 ```json
 {
@@ -868,11 +904,23 @@ Từ response, tìm object có `"item_key": "DAT-4019091621-5021368067"`.
   "etsy_line_item_id": "4986531800",
 
   "status": "NEW",
-  "provider": "",
+  "provider": [
+    { "provider": "ProviderA", "exported_at": "2025-01-20T08:00:00Z", "user_email": "user@example.com" }
+  ],
   "material": "",
+  "designer": { "id": "", "name": "" },
+
+  "shipping": {
+    "name": "John Doe",
+    "street": "123 Main St",
+    "city": "New York",
+    "state": "NY",
+    "zip_code": "10001",
+    "country": "US"
+  },
 
   "image_link": "https://...",
-  "source_cost": "12.50",
+  "price": "12.50",
   "quantity": 1,
   "product_name": "Custom Necklace",
   "personalization": "Name: Jane",
@@ -883,10 +931,13 @@ Từ response, tìm object có `"item_key": "DAT-4019091621-5021368067"`.
   "mockup_link": "",
 
   "tracking": { "code": "", "carrier": "", "url": "" },
+  "fulfillment_cost": "",
+  "ff_name_by_day": "",
 
   "version": 2,
   "created_at": "2025-01-15T10:30:00Z",
-  "updated_at": "2025-01-16T08:00:00Z"
+  "updated_at": "2025-01-16T08:00:00Z",
+  "updated_by": "user@example.com"
 }
 ```
 
@@ -898,23 +949,31 @@ Hệ thống phân biệt 2 loại field:
 
 ### Source-Managed Fields (Order)
 
-Các field này được quản lý bởi nguồn dữ liệu (Dora extension, Gmail sync). Khi ingest, chỉ các field này bị ghi đè:
+Các field này được quản lý bởi nguồn dữ liệu (Dora extension, Gmail sync, Etsy API). Khi ingest, chỉ các field này bị ghi đè:
 
-`order_id`, `channel`, `shop_id`, `etsy_account`, `store`, `customer`, `shipping`, `pricing`, `source_link`, `vat_ioss`, `created_at`, `project_id`
+`order_id`, `channel`, `shop_id`, `etsy_account`, `store`, `customer`, `pricing`, `vat_ioss`, `created_at`, `project_id`, `order_date`
 
 ### User-Managed Fields (Order)
 
-Các field user/system bên ngoài được phép PATCH:
+Các field user/system bên ngoài được phép PATCH qua `PATCH /api/v2/orders/:order_id`:
 
-`note`, `provider`, `material`, `customer`, `shipping`, `pricing`, `tracking`, `channel`, `store`, `source_link`, `vat_ioss`, `etsy_account`, `mockup_link`, `fulfillment_cost`, `export_count`, `ff_name_by_day`, `is_split_items`, `is_deleted`, `personalization`
+`note`, `customer`, `pricing`, `channel`, `store`, `vat_ioss`, `etsy_account`, `export_count`, `is_split_items`, `is_deleted`
 
-> `status` và `designer` trên order **không** được phép PATCH qua endpoint này.
+> `customer` và `pricing` nằm ở cả 2 nhóm — ingest ghi đè, nhưng user cũng có thể sửa (cho manual orders hoặc corrections).
 
-> **Lưu ý:** `customer`, `shipping`, `pricing` nằm ở cả 2 nhóm — ingest ghi đè, nhưng user cũng có thể sửa (cho manual orders hoặc corrections).
+### Source-Managed Fields (OrderItem)
 
-### User-Managed Fields (Item)
+Khi ingest cập nhật item, chỉ các field sau bị ghi đè:
 
-`status`, `provider`, `material`, `product_name`, `quantity`, `image_link`, `source_cost`, `product_type`, `design_link`, `customer_image`, `mockup_link`, `tracking`, `personalization`, `designer`
+`item_key`, `order_id`, `etsy_line_item_id`, `product_name`, `personalization`, `quantity`, `image_link`, `price`
+
+Khi **tạo mới** item từ ingest, `shipping` được set từ địa chỉ giao hàng của order nguồn. Sau đó shipping là user-managed (không bị overwrite khi ingest update lại).
+
+### User-Managed Fields (OrderItem)
+
+Các field được phép PATCH qua `PATCH /api/v2/order-items/:item_key`:
+
+`status`, `provider`, `material`, `shipping`, `product_name`, `quantity`, `image_link`, `price`, `product_type`, `design_link`, `customer_image`, `mockup_link`, `tracking`, `personalization`, `designer`, `fulfillment_cost`, `ff_name_by_day`
 
 ### System Fields (không thể PATCH)
 
@@ -929,7 +988,7 @@ Mọi PATCH request đều yêu cầu field `version` trong body. Giá trị ph�
 **Flow:**
 
 1. Client GET order → nhận `version: 3`
-2. Client PATCH với `{ "version": 3, "status": "DESIGNING" }`
+2. Client PATCH với `{ "version": 3, "note": "updated" }`
 3. Server kiểm tra version khớp → cập nhật, tăng version lên 4
 4. Nếu version không khớp (ai đó đã sửa trước) → trả `409 Conflict` kèm object mới nhất
 
@@ -959,7 +1018,7 @@ Mọi thay đổi qua API đều được ghi audit event vào collection `audit
   "order_id": "DAV-3999799511",
   "action": "update",
   "changes": [
-    { "path": "status", "from": "NEW", "to": "DESIGNING" }
+    { "path": "note", "from": "", "to": "Rush order" }
   ],
   "actor": { "type": "user", "id": "user-123", "email": "nguyen@company.com" },
   "meta": {
@@ -992,7 +1051,7 @@ Mọi thay đổi qua API đều được ghi audit event vào collection `audit
 | `soft_delete` | Xóa mềm |
 | `split_on` | Bật split items |
 | `split_off` | Tắt split items |
-| `ingest_created` | Tạo từ ingest (Dora/Gmail) |
+| `ingest_created` | Tạo từ ingest (Dora/Gmail/Etsy API) |
 | `ingest_updated` | Cập nhật từ ingest |
 
 ### Source
@@ -1020,13 +1079,13 @@ Khi order/item thay đổi qua API, hệ thống broadcast SSE event tới Desig
 ```json
 {
   "type": "entity.updated",
-  "entity_type": "order",
-  "entity_id": "DAV-3999799511",
+  "entity_type": "order_item",
+  "entity_id": "DAV-3999799511-4986531800",
   "order_id": "DAV-3999799511",
   "version": 4,
-  "changed_fields": ["status", "designer"],
+  "changed_fields": ["status", "tracking"],
   "updated_at": "2025-01-16T08:00:00Z",
-  "item_keys": []
+  "item_keys": ["DAV-3999799511-4986531800"]
 }
 ```
 
@@ -1049,8 +1108,8 @@ Khi order/item thay đổi qua API, hệ thống broadcast SSE event tới Desig
 // Thiếu version
 { "error": "version (integer) is required" }
 
-// Field không được phép sửa
-{ "error": "cannot modify source-managed or system fields", "rejected_fields": ["created_at"] }
+// Field không được phép sửa (gửi shipping/tracking/provider lên order endpoint)
+{ "error": "cannot modify source-managed or system fields", "rejected_fields": ["shipping"] }
 
 // Không có field nào để update
 { "error": "no fields to update" }

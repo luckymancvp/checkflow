@@ -110,6 +110,10 @@ export interface MeraListOrdersParams {
   project_id?: string
   q?: string
   include_items?: boolean
+  /** Format YYYY-MM-DD */
+  date_from?: string
+  /** Format YYYY-MM-DD */
+  date_to?: string
 }
 
 export interface MeraListOrdersResponse {

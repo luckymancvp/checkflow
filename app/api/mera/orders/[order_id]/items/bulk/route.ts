@@ -1,8 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, unauthorizedResponse } from "@/lib/auth"
 import { meraClient } from "@/lib/mera-client"
+import { createServerClient } from "@/lib/supabase"
 import { logServerError } from "@/lib/server-sentry"
+import { logMeraStatusHistory } from "@/lib/mera-history"
 import type { MeraBulkPatchItemsBody } from "@/types/mera-order"
+
+type ExtendedBody = MeraBulkPatchItemsBody & {
+  change_type?: "design_error" | "customer_change" | null
+  order_note?: string | null
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -12,9 +19,36 @@ export async function PATCH(
     const appUser = await authenticateRequest(request)
     const actor = { id: appUser.sub, email: appUser.email }
     const { order_id } = await params
-    const body: MeraBulkPatchItemsBody = await request.json()
+    const { change_type, order_note, ...meraBody } = (await request.json()) as ExtendedBody
 
-    const data = await meraClient.bulkPatchItems(actor, order_id, body)
+    const newStatus = meraBody.fields?.status
+    if (newStatus === "NEED REPAIR" && !change_type) {
+      return NextResponse.json(
+        { error: "change_type required when status is NEED REPAIR" },
+        { status: 400 }
+      )
+    }
+    if (change_type && !["design_error", "customer_change"].includes(change_type)) {
+      return NextResponse.json({ error: "Invalid change_type" }, { status: 400 })
+    }
+
+    const data = await meraClient.bulkPatchItems(actor, order_id, meraBody)
+
+    if (newStatus) {
+      const supabase = createServerClient()
+      await Promise.all(
+        (data.items ?? []).map((item) =>
+          logMeraStatusHistory(supabase, {
+            item,
+            status: newStatus,
+            changeType: change_type ?? null,
+            orderNote: order_note ?? null,
+            createdBy: appUser.sub,
+          })
+        )
+      )
+    }
+
     return NextResponse.json(data)
   } catch (err) {
     if ((err as Error).message?.includes("Missing") || (err as Error).message?.includes("Invalid")) {
