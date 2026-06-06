@@ -416,7 +416,8 @@ export default function ReviewPage() {
   const handleMeraStatusUpdate = async (
     order: Order & { _mera?: MeraOrder },
     newStatus: Order["status"],
-    _note?: string,
+    note?: string,
+    changeType?: "design_error" | "customer_change",
   ): Promise<boolean> => {
     const meraOrder = order._mera
     if (!meraOrder) return false
@@ -456,7 +457,15 @@ export default function ReviewPage() {
     let version = item.version
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const updatedItem = await meraPatchItem(item.item_key, { version, status: meraStatus })
+        const updatedItem = await meraPatchItem(
+          item.item_key,
+          {
+            version,
+            status: meraStatus,
+            ...(changeType ? { change_type: changeType } : {}),
+            ...(note !== undefined ? { order_note: note } : {}),
+          } as unknown as Parameters<typeof meraPatchItem>[1],
+        )
         applySuccess(updatedItem)
         return true
       } catch (err) {
@@ -668,7 +677,7 @@ export default function ReviewPage() {
         } else {
           setReviewMode(null)
         }
-        handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note)
+        handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, targetStatus, note, repairType)
       } else if (action === "skip") {
         if (reviewMode.currentIndex < reviewMode.orders.length - 1) {
           handleReviewNext()
@@ -708,7 +717,7 @@ export default function ReviewPage() {
     const currentOrder = reviewMode.orders[reviewMode.currentIndex]
 
     const success = dataSource === "mera"
-      ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, newStatus, note)
+      ? await handleMeraStatusUpdate(currentOrder as Order & { _mera?: MeraOrder }, newStatus, note, changeType)
       : await updateOrderStatus(currentOrder, newStatus, note, changeType)
 
     if (success) {

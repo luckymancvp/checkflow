@@ -27,6 +27,9 @@ import {
   ArrowUpDown,
 } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
+import { useMeraProjects } from "@/hooks/use-mera-projects"
+import { MultiSelect } from "@/components/ui/multi-select"
+import { ALL_STATUSES } from "@/constants/statuses"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { format } from "date-fns"
 import { format as timeAgo } from "timeago.js"
@@ -40,6 +43,34 @@ export default function NeedRepairPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null)
+  // Multi-select các sheet cụ thể (rỗng = tất cả)
+  const [selectedSheetIds, setSelectedSheetIds] = useState<string[]>([])
+  // Multi-select trạng thái HIỆN TẠI của đơn (rỗng = tất cả status)
+  const [selectedCurrentStatuses, setSelectedCurrentStatuses] = useState<string[]>([])
+  // Multi-select Mera projects (rỗng = tất cả)
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
+  // Bật/tắt nguồn — mặc định gộp cả 2
+  const [includeSheet, setIncludeSheet] = useState(true)
+  const [includeMera, setIncludeMera] = useState(true)
+
+  // Lấy list sheet để build options cho MultiSelect
+  const { data: sheetsResp } = useApi("/sheets")
+  const sheetOptions = useMemo(() => {
+    const arr = (sheetsResp as any)?.data ?? []
+    return arr.map((s: any) => ({
+      value: s.google_sheet_id,
+      label: s.name || s.google_sheet_id,
+    }))
+  }, [sheetsResp])
+  const statusOptions = useMemo(
+    () => ALL_STATUSES.map((s) => ({ value: s, label: s })),
+    [],
+  )
+  const { projects: meraProjects } = useMeraProjects()
+  const projectOptions = useMemo(
+    () => meraProjects.map((p) => ({ value: p.id, label: p.name })),
+    [meraProjects],
+  )
 
   // Filter + sort cho bảng By Designer
   const [designerSearch, setDesignerSearch] = useState("")
@@ -85,6 +116,11 @@ export default function NeedRepairPage() {
       params.set("startDate", dateRange.from.toISOString())
       params.set("endDate", dateRange.to.toISOString())
     }
+    if (selectedSheetIds.length > 0) params.set("sheetIds", selectedSheetIds.join(","))
+    if (selectedCurrentStatuses.length > 0) params.set("currentStatuses", selectedCurrentStatuses.join(","))
+    if (selectedProjectIds.length > 0) params.set("projectIds", selectedProjectIds.join(","))
+    if (!includeSheet) params.set("includeSheet", "false")
+    if (!includeMera) params.set("includeMera", "false")
     return `/need-repair/stats?${params.toString()}`
   }
 
@@ -239,26 +275,91 @@ export default function NeedRepairPage() {
 
       <Card className="shadow-md border-0">
         <CardHeader>
-          <CardTitle className="text-lg">Time Period</CardTitle>
-          <CardDescription>Select the time range for repair statistics</CardDescription>
+          <CardTitle className="text-lg">Filters</CardTitle>
+          <CardDescription>
+            Time range áp dụng cho thời điểm reviewer mark NEED REPAIR (order_history.created_at)
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4">
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="this_week">This Week</SelectItem>
-                <SelectItem value="last_week">Last Week</SelectItem>
-                <SelectItem value="this_month">This Month</SelectItem>
-                <SelectItem value="last_month">Last Month</SelectItem>
-                <SelectItem value="all_time">All Time</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500 font-medium">Time Period</span>
+              <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="yesterday">Yesterday</SelectItem>
+                  <SelectItem value="this_week">This Week</SelectItem>
+                  <SelectItem value="last_week">Last Week</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                  <SelectItem value="last_month">Last Month</SelectItem>
+                  <SelectItem value="all_time">All Time</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500 font-medium">Sheet</span>
+              <MultiSelect
+                options={sheetOptions}
+                value={selectedSheetIds}
+                onChange={setSelectedSheetIds}
+                placeholder="All sheets"
+                className="w-56"
+                emptyText="No sheets"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500 font-medium">Mera projects</span>
+              <MultiSelect
+                options={projectOptions}
+                value={selectedProjectIds}
+                onChange={setSelectedProjectIds}
+                placeholder="All projects"
+                className="w-56"
+                emptyText="No projects"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500 font-medium">Trạng thái hiện tại</span>
+              <MultiSelect
+                options={statusOptions}
+                value={selectedCurrentStatuses}
+                onChange={setSelectedCurrentStatuses}
+                placeholder="All statuses"
+                className="w-56"
+                emptyText="No statuses"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500 font-medium">Source</span>
+              <div className="flex gap-1 h-10 items-center">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={includeSheet ? "default" : "outline"}
+                  onClick={() => setIncludeSheet((v) => !v)}
+                  className={includeSheet ? "bg-pink-600 hover:bg-pink-700 text-white" : "bg-transparent"}
+                >
+                  Sheet
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={includeMera ? "default" : "outline"}
+                  onClick={() => setIncludeMera((v) => !v)}
+                  className={includeMera ? "bg-pink-600 hover:bg-pink-700 text-white" : "bg-transparent"}
+                >
+                  Mera
+                </Button>
+              </div>
+            </div>
 
             {timeRange === "custom" && (
               <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -621,6 +722,7 @@ export default function NeedRepairPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Item ID</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Designer</TableHead>
                   <TableHead>Checker</TableHead>
                   <TableHead>Product</TableHead>
@@ -648,6 +750,18 @@ export default function NeedRepairPage() {
                           />
                         </Button>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          repair.source === "mera"
+                            ? "bg-purple-50 text-purple-700 border-purple-200"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        }
+                      >
+                        {repair.source === "mera" ? "Mera" : "Sheet"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

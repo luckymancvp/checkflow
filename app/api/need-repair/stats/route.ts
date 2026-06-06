@@ -2,6 +2,37 @@ import { type NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, unauthorizedResponse } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase"
 import { logServerError, logServerInfo } from "@/lib/server-sentry"
+import { meraClient } from "@/lib/mera-client"
+import type { MeraOrder } from "@/types/mera-order"
+
+const MERA_SHEET_ID = "__mera__"
+const MERA_PAGE_SIZE = 500
+const MERA_MAX_PAGES = 20
+
+function ymd(d: Date): string {
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0")
+  const day = String(d.getUTCDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+async function fetchAllMeraOrders(
+  actor: { id: string; email: string },
+  params: Parameters<typeof meraClient.listOrders>[1],
+): Promise<MeraOrder[]> {
+  const all: MeraOrder[] = []
+  for (let page = 1; page <= MERA_MAX_PAGES; page++) {
+    const res = await meraClient.listOrders(actor, {
+      ...params,
+      page,
+      page_size: MERA_PAGE_SIZE,
+      include_items: true,
+    })
+    all.push(...(res.orders ?? []))
+    if (page >= (res.total_pages ?? 0)) break
+  }
+  return all
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +43,49 @@ export async function GET(request: NextRequest) {
     const timeRange = searchParams.get("timeRange") || "all_time"
     const startDate = searchParams.get("startDate")
     const endDate = searchParams.get("endDate")
+    // sheetIds: CSV list of google_sheet_id để lọc theo các sheet cụ thể. Rỗng = tất cả.
+    const sheetIdsParam = searchParams.get("sheetIds") || ""
+    const sheetIds = sheetIdsParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    // currentStatuses: CSV list of status. Khi có giá trị → chỉ giữ đơn HIỆN ĐANG ở status đó.
+    // Rỗng = không lọc theo trạng thái hiện tại.
+    const currentStatusesParam = searchParams.get("currentStatuses") || ""
+    const currentStatuses = currentStatusesParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    // projectIds: CSV list of Mera project ID. Filter cho phần data Mera. Rỗng = tất cả project.
+    const projectIdsParam = searchParams.get("projectIds") || ""
+    const projectIds = projectIdsParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    // includeMera / includeSheet: true/false (mặc định true cả 2). Để user có thể tắt 1 nguồn.
+    const includeMera = (searchParams.get("includeMera") ?? "true") === "true"
+    const includeSheet = (searchParams.get("includeSheet") ?? "true") === "true"
+
+    const applySheetFilter = (q: any): any => {
+      if (sheetIds.length > 0) return q.in("google_sheet_id", sheetIds)
+      return q
+    }
+
+    // Filter cho query order_history (chung cho cả Sheet & Mera).
+    // Mera dùng google_sheet_id = '__mera__' nên cùng schema.
+    const applySourceFilter = (q: any): any => {
+      if (includeSheet && includeMera) {
+        if (sheetIds.length > 0) return q.in("google_sheet_id", [...sheetIds, MERA_SHEET_ID])
+        return q
+      }
+      if (includeSheet) {
+        if (sheetIds.length > 0) return q.in("google_sheet_id", sheetIds)
+        return q.neq("google_sheet_id", MERA_SHEET_ID)
+      }
+      if (includeMera) return q.eq("google_sheet_id", MERA_SHEET_ID)
+      // cả 2 đều tắt — trả query rỗng bằng filter impossible
+      return q.eq("google_sheet_id", "__none__")
+    }
 
     // Calculate date range based on timeRange parameter
     const getDateRange = () => {
@@ -54,57 +128,148 @@ export async function GET(request: NextRequest) {
 
     const dateRange = getDateRange()
 
-    // Build the query
-    let query = supabase
-      .from("order_history")
-      .select(`
-        id,
-        item_id,
-        designer,
-        change_type,
-        created_at,
-        product_type,
-        order_note,
-        users!created_by(email)
-      `)
-      .eq("status", "NEED REPAIR")
+    // === Query order_history cho cả Sheet & Mera (Mera log qua /api/mera/* PATCH) ===
+    let repairDataRaw: any[] | null = []
+    let error: any = null
+    {
+      let query = supabase
+        .from("order_history")
+        .select(`
+          id,
+          item_id,
+          google_sheet_id,
+          designer,
+          change_type,
+          created_at,
+          product_type,
+          order_note,
+          users!created_by(email)
+        `)
+        .eq("status", "NEED REPAIR")
+      query = applySourceFilter(query)
 
-    // Apply date filter if specified
-    if (dateRange) {
-      query = query.gte("created_at", dateRange.start.toISOString()).lt("created_at", dateRange.end.toISOString())
+      if (dateRange) {
+        query = query.gte("created_at", dateRange.start.toISOString()).lt("created_at", dateRange.end.toISOString())
+      }
+
+      const result = await query.order("created_at", { ascending: false })
+      repairDataRaw = result.data as any[]
+      error = result.error
     }
 
-    const { data: repairData, error } = await query.order("created_at", { ascending: false })
-
-    // Query mẫu số: tổng số đơn trong bảng `orders` (theo cùng date range để consistent).
-    // Dùng để tính "Tỉ lệ cần sửa" = số đơn cần sửa / tổng đơn designer đã xử lý.
-    let ordersQuery = supabase.from("orders").select("item_id, designer, created_at")
-    if (dateRange) {
-      ordersQuery = ordersQuery
-        .gte("created_at", dateRange.start.toISOString())
-        .lt("created_at", dateRange.end.toISOString())
+    // Nếu có currentStatuses → lấy map (item_id, google_sheet_id) → status hiện tại từ orders,
+    // rồi loại history row không có status hiện tại nằm trong set chọn.
+    let currentStatusMap: Map<string, string> | null = null
+    if (currentStatuses.length > 0 && includeSheet) {
+      let curQuery = supabase.from("orders").select("item_id, google_sheet_id, status").in("status", currentStatuses)
+      curQuery = applySheetFilter(curQuery)
+      const { data: curRows, error: curErr } = await curQuery
+      if (curErr) {
+        logServerError(curErr, {
+          context: "GET /api/need-repair/stats - current status filter",
+          userId: appUser.sub,
+          timeRange,
+        })
+      } else {
+        currentStatusMap = new Map(
+          (curRows ?? []).map((r: any) => [`${r.item_id}::${r.google_sheet_id}`, r.status]),
+        )
+      }
     }
-    const { data: ordersData, error: ordersError } = await ordersQuery
-    if (ordersError) {
-      logServerError(ordersError, {
-        context: "GET /api/need-repair/stats - orders denominator",
-        userId: appUser.sub,
-        timeRange,
-      })
-      // Không fail toàn bộ — chỉ là phần mẫu số. Tỉ lệ sẽ rỗng nếu không có dữ liệu.
-    }
 
-    // Map: designer -> Set<item_id> để đếm distinct đơn mỗi designer xử lý
+    let repairData: any[] = currentStatusMap
+      ? (repairDataRaw ?? []).filter((r: any) => {
+          // Mera rows được filter riêng ở khối Mera bên dưới (dựa trên current item status từ Mera).
+          if (r.google_sheet_id === MERA_SHEET_ID) return true
+          return currentStatusMap!.has(`${r.item_id}::${r.google_sheet_id}`)
+        })
+      : (repairDataRaw ?? [])
+
+    // Query mẫu số (Sheet): tổng số đơn trong bảng `orders` (theo cùng date range để consistent).
     const ordersByDesigner = new Map<string, Set<string>>()
     const allOrdersItemIds = new Set<string>()
-    ordersData?.forEach((row) => {
-      const designer = row.designer || "Unassigned"
-      const itemId = row.item_id
-      if (!itemId) return
-      allOrdersItemIds.add(itemId)
-      if (!ordersByDesigner.has(designer)) ordersByDesigner.set(designer, new Set())
-      ordersByDesigner.get(designer)!.add(itemId)
-    })
+    if (includeSheet) {
+      let ordersQuery = supabase.from("orders").select("item_id, designer, created_at, google_sheet_id")
+      ordersQuery = applySheetFilter(ordersQuery)
+      if (dateRange) {
+        ordersQuery = ordersQuery
+          .gte("created_at", dateRange.start.toISOString())
+          .lt("created_at", dateRange.end.toISOString())
+      }
+      const { data: ordersData, error: ordersError } = await ordersQuery
+      if (ordersError) {
+        logServerError(ordersError, {
+          context: "GET /api/need-repair/stats - orders denominator",
+          userId: appUser.sub,
+          timeRange,
+        })
+      }
+      ordersData?.forEach((row) => {
+        const designer = row.designer || "Unassigned"
+        const itemId = row.item_id
+        if (!itemId) return
+        allOrdersItemIds.add(itemId)
+        if (!ordersByDesigner.has(designer)) ordersByDesigner.set(designer, new Set())
+        ordersByDesigner.get(designer)!.add(itemId)
+      })
+    }
+
+    // === MERA branch — chỉ fetch để có mẫu số (tổng đơn designer xử lý) ===
+    // Tử số (NEED REPAIR) đã được log vào order_history khi PATCH qua /api/mera/*,
+    // và đã được query chung ở khối order_history phía trên.
+    // Ngoài ra dùng để build map current-status cho filter currentStatuses.
+    if (includeMera) {
+      try {
+        const actor = { id: appUser.sub, email: appUser.email }
+        const meraDateParams: { date_from?: string; date_to?: string } = {}
+        if (dateRange) {
+          meraDateParams.date_from = ymd(dateRange.start)
+          meraDateParams.date_to = ymd(new Date(dateRange.end.getTime() - 1))
+        }
+
+        const meraDenomOrders = await fetchAllMeraOrders(actor, { ...meraDateParams })
+        const matchProject = (o: MeraOrder) =>
+          projectIds.length === 0 || (o.project_id && projectIds.includes(o.project_id))
+
+        // Mẫu số + map current status cho từng Mera item
+        const meraCurrentStatusByItem = new Map<string, string>()
+        for (const order of meraDenomOrders) {
+          if (!matchProject(order)) continue
+          const items = order.items ?? []
+          for (const item of items) {
+            if (!item.item_key) continue
+            meraCurrentStatusByItem.set(item.item_key, item.status)
+            const designer = item.designer?.name || order.designer?.name || "Unassigned"
+            allOrdersItemIds.add(item.item_key)
+            if (!ordersByDesigner.has(designer)) ordersByDesigner.set(designer, new Set())
+            ordersByDesigner.get(designer)!.add(item.item_key)
+          }
+        }
+
+        // Áp filter currentStatuses cho Mera rows nếu có
+        if (currentStatuses.length > 0) {
+          repairData = repairData.filter((r: any) => {
+            if (r.google_sheet_id !== MERA_SHEET_ID) return true
+            const cur = meraCurrentStatusByItem.get(r.item_id)
+            return cur ? currentStatuses.includes(cur) : false
+          })
+        } else if (projectIds.length > 0) {
+          // Khi không lọc currentStatuses nhưng có lọc project — chỉ giữ Mera rows
+          // thuộc các project được chọn (đo bằng map đã build từ meraDenomOrders).
+          repairData = repairData.filter((r: any) => {
+            if (r.google_sheet_id !== MERA_SHEET_ID) return true
+            return meraCurrentStatusByItem.has(r.item_id)
+          })
+        }
+      } catch (meraErr) {
+        logServerError(meraErr as Error, {
+          context: "GET /api/need-repair/stats - Mera fetch",
+          userId: appUser.sub,
+          timeRange,
+        })
+        // Mera fail không làm hỏng toàn bộ — chỉ thiếu phần mẫu số Mera.
+      }
+    }
 
     if (error) {
       logServerError(error, {
@@ -258,6 +423,7 @@ export async function GET(request: NextRequest) {
         order_note: record.order_note,
         created_at: record.created_at,
         users: record.users,
+        source: record.google_sheet_id === MERA_SHEET_ID ? "mera" : "sheet",
       })) || []
 
     logServerInfo("Need repair statistics fetched successfully", {
