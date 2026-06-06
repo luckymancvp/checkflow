@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -12,16 +13,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   AlertTriangle,
   Users,
-  TrendingUp,
   CalendarIcon,
   RefreshCw,
-  ArrowUpRight,
-  ArrowDownRight,
   Package,
   User,
   Clock,
   Mail,
   Copy,
+  Repeat,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -37,6 +40,34 @@ export default function NeedRepairPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null)
+
+  // Filter + sort cho bảng By Designer
+  const [designerSearch, setDesignerSearch] = useState("")
+  type SortKey =
+    | "designer"
+    | "orders"
+    | "total_orders_processed"
+    | "repair_rate_design_error"
+    | "repair_rate_customer_change"
+    | "times"
+    | "avg_times_per_order"
+    | "design_error"
+    | "customer_change"
+  const [sortKey, setSortKey] = useState<SortKey>("orders")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortKey(key)
+      setSortDir(key === "designer" ? "asc" : "desc")
+    }
+  }
+
+  // Filter cho bảng Detailed Repair Records
+  const [detailSearch, setDetailSearch] = useState("")
+  const [detailDesigner, setDetailDesigner] = useState<string>("__all__")
+  const [detailProduct, setDetailProduct] = useState<string>("__all__")
 
   const copyItemId = async (itemId: string) => {
     try {
@@ -100,6 +131,68 @@ export default function NeedRepairPage() {
     }
   }
 
+  const summary = stats?.data?.summary || {}
+  const designerStats = stats?.data?.designerStats || []
+  const productTypeStats = stats?.data?.productTypeStats || []
+  const detailedRecords = stats?.data?.detailedRecords || []
+
+  const filteredDesignerStats = useMemo(() => {
+    const q = designerSearch.trim().toLowerCase()
+    const rows = q
+      ? designerStats.filter((d: any) => (d.designer || "").toLowerCase().includes(q))
+      : [...designerStats]
+    rows.sort((a: any, b: any) => {
+      const va = a[sortKey]
+      const vb = b[sortKey]
+      // null/undefined sort xuống cuối
+      const an = va === null || va === undefined
+      const bn = vb === null || vb === undefined
+      if (an && bn) return 0
+      if (an) return 1
+      if (bn) return -1
+      if (typeof va === "string" && typeof vb === "string") {
+        return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va)
+      }
+      return sortDir === "asc" ? Number(va) - Number(vb) : Number(vb) - Number(va)
+    })
+    return rows
+  }, [designerStats, designerSearch, sortKey, sortDir])
+
+  const detailDesignerOptions = useMemo(() => {
+    const set = new Set<string>()
+    detailedRecords.forEach((r: any) => r.designer && set.add(r.designer))
+    return Array.from(set).sort()
+  }, [detailedRecords])
+
+  const detailProductOptions = useMemo(() => {
+    const set = new Set<string>()
+    detailedRecords.forEach((r: any) => r.product_type && set.add(r.product_type))
+    return Array.from(set).sort()
+  }, [detailedRecords])
+
+  const filteredDetailedRecords = useMemo(() => {
+    const q = detailSearch.trim().toLowerCase()
+    return detailedRecords.filter((r: any) => {
+      if (detailDesigner !== "__all__" && r.designer !== detailDesigner) return false
+      if (detailProduct !== "__all__" && r.product_type !== detailProduct) return false
+      if (q) {
+        const itemId = String(r.item_id || "").toLowerCase()
+        const note = String(r.order_note || "").toLowerCase()
+        if (!itemId.includes(q) && !note.includes(q)) return false
+      }
+      return true
+    })
+  }, [detailedRecords, detailSearch, detailDesigner, detailProduct])
+
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 ml-1 inline text-gray-400" />
+    return sortDir === "asc" ? (
+      <ArrowUp className="h-3 w-3 ml-1 inline text-pink-600" />
+    ) : (
+      <ArrowDown className="h-3 w-3 ml-1 inline text-pink-600" />
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex-1 space-y-6 p-6">
@@ -125,11 +218,6 @@ export default function NeedRepairPage() {
       </div>
     )
   }
-
-  const summary = stats?.data?.summary || {}
-  const designerStats = stats?.data?.designerStats || []
-  const productTypeStats = stats?.data?.productTypeStats || []
-  const detailedRecords = stats?.data?.detailedRecords || []
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -206,15 +294,26 @@ export default function NeedRepairPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Card className="shadow-md border-0 bg-gradient-to-br from-red-50 to-red-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Total Repairs</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-700">Total Repair Orders</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{summary.totalRepairs || 0}</div>
-            <p className="text-xs text-gray-600 mt-1">Items needing repair</p>
+            <div className="text-2xl font-bold text-gray-900">{summary.totalOrders ?? summary.totalRepairs ?? 0}</div>
+            <p className="text-xs text-gray-600 mt-1">Distinct items needing repair</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md border-0 bg-gradient-to-br from-purple-50 to-purple-100">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Repair Times</CardTitle>
+            <Repeat className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{summary.totalTimes ?? summary.totalRepairs ?? 0}</div>
+            <p className="text-xs text-gray-600 mt-1">Total NEED REPAIR marks</p>
           </CardContent>
         </Card>
 
@@ -267,22 +366,90 @@ export default function NeedRepairPage() {
               </CardTitle>
               <CardDescription>Breakdown of repair requests by designer and issue type</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  value={designerSearch}
+                  onChange={(e) => setDesignerSearch(e.target.value)}
+                  placeholder="Search designer..."
+                  className="pl-9"
+                />
+              </div>
               {designerStats.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Designer</TableHead>
-                      <TableHead className="text-center">Total</TableHead>
-                      <TableHead className="text-center">Design Errors</TableHead>
-                      <TableHead className="text-center">Customer Changes</TableHead>
-                      <TableHead className="text-center">Error Rate</TableHead>
+                      <TableHead onClick={() => toggleSort("designer")} className="cursor-pointer select-none">
+                        Designer <SortIcon k="designer" />
+                      </TableHead>
+                      <TableHead onClick={() => toggleSort("orders")} className="text-center cursor-pointer select-none">
+                        Đơn cần sửa <SortIcon k="orders" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("total_orders_processed")}
+                        className="text-center cursor-pointer select-none"
+                      >
+                        Tổng đơn <SortIcon k="total_orders_processed" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("repair_rate_design_error")}
+                        className="text-center cursor-pointer select-none"
+                      >
+                        Tỉ lệ Design Error <SortIcon k="repair_rate_design_error" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("repair_rate_customer_change")}
+                        className="text-center cursor-pointer select-none"
+                      >
+                        Tỉ lệ Customer Change <SortIcon k="repair_rate_customer_change" />
+                      </TableHead>
+                      <TableHead onClick={() => toggleSort("times")} className="text-center cursor-pointer select-none">
+                        Lần sửa <SortIcon k="times" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("avg_times_per_order")}
+                        className="text-center cursor-pointer select-none"
+                      >
+                        TB lần/đơn <SortIcon k="avg_times_per_order" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("design_error")}
+                        className="text-center cursor-pointer select-none"
+                      >
+                        Design Errors <SortIcon k="design_error" />
+                      </TableHead>
+                      <TableHead
+                        onClick={() => toggleSort("customer_change")}
+                        className="text-center cursor-pointer select-none"
+                      >
+                        Customer Changes <SortIcon k="customer_change" />
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {designerStats.map((designer: any, index: number) => {
-                      const errorRate =
-                        designer.total > 0 ? ((designer.design_error / designer.total) * 100).toFixed(1) : "0.0"
+                    {filteredDesignerStats.map((designer: any, index: number) => {
+                      const orders = designer.orders ?? designer.total ?? 0
+                      const times = designer.times ?? designer.total ?? 0
+                      const avgPerOrder = orders > 0 ? (times / orders).toFixed(2) : "0.00"
+                      const totalProcessed = designer.total_orders_processed ?? 0
+                      const rateDE: number | null =
+                        typeof designer.repair_rate_design_error === "number"
+                          ? designer.repair_rate_design_error
+                          : null
+                      const rateCC: number | null =
+                        typeof designer.repair_rate_customer_change === "number"
+                          ? designer.repair_rate_customer_change
+                          : null
+                      const fmtRate = (r: number | null) => (r === null ? "N/A" : r.toFixed(1) + "%")
+                      const colorRate = (r: number | null, hi: number, mid: number) =>
+                        r === null
+                          ? "text-gray-400"
+                          : r > hi
+                            ? "text-red-600"
+                            : r > mid
+                              ? "text-orange-600"
+                              : "text-green-600"
                       return (
                         <TableRow key={index}>
                           <TableCell className="font-medium">
@@ -298,8 +465,27 @@ export default function NeedRepairPage() {
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge variant="outline" className="bg-gray-50">
-                              {designer.total}
+                              {orders}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+                              {totalProcessed}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`font-medium ${colorRate(rateDE, 25, 10)}`}>{fmtRate(rateDE)}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`font-medium ${colorRate(rateCC, 25, 10)}`}>{fmtRate(rateCC)}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                              {times}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-medium text-gray-900">{avgPerOrder}</span>
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
@@ -310,22 +496,6 @@ export default function NeedRepairPage() {
                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                               {designer.customer_change}
                             </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <span
-                                className={`font-medium ${Number.parseFloat(errorRate) > 20 ? "text-red-600" : Number.parseFloat(errorRate) > 10 ? "text-orange-600" : "text-green-600"}`}
-                              >
-                                {errorRate}%
-                              </span>
-                              {Number.parseFloat(errorRate) > 20 ? (
-                                <ArrowUpRight className="h-3 w-3 text-red-600" />
-                              ) : Number.parseFloat(errorRate) > 10 ? (
-                                <TrendingUp className="h-3 w-3 text-orange-600" />
-                              ) : (
-                                <ArrowDownRight className="h-3 w-3 text-green-600" />
-                              )}
-                            </div>
                           </TableCell>
                         </TableRow>
                       )
@@ -405,8 +575,48 @@ export default function NeedRepairPage() {
           </CardTitle>
           <CardDescription>Individual repair items with designer and error details</CardDescription>
         </CardHeader>
-        <CardContent>
-          {detailedRecords.length > 0 ? (
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                value={detailSearch}
+                onChange={(e) => setDetailSearch(e.target.value)}
+                placeholder="Search Item ID hoặc Order Note..."
+                className="pl-9"
+              />
+            </div>
+            <Select value={detailDesigner} onValueChange={setDetailDesigner}>
+              <SelectTrigger>
+                <SelectValue placeholder="All designers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All designers</SelectItem>
+                {detailDesignerOptions.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={detailProduct} onValueChange={setDetailProduct}>
+              <SelectTrigger>
+                <SelectValue placeholder="All products" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All products</SelectItem>
+                {detailProductOptions.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="text-xs text-gray-500">
+            Hiển thị {filteredDetailedRecords.length} / {detailedRecords.length} records
+          </div>
+          {filteredDetailedRecords.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -419,7 +629,7 @@ export default function NeedRepairPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {detailedRecords.map((repair: any) => (
+                {filteredDetailedRecords.map((repair: any) => (
                   <TableRow key={repair.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
