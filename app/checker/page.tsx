@@ -14,6 +14,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { BarChart3, CalendarIcon, ChevronLeft, Clock, Eye, RefreshCw, TrendingUp, Users } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { MultiSelect } from "@/components/ui/multi-select"
+import { ALL_STATUSES } from "@/constants/statuses"
+import { useMeraProjects } from "@/hooks/use-mera-projects"
 
 interface ReviewerStat {
   id: string
@@ -27,12 +30,17 @@ interface ReviewerStat {
     design_error: number
     customer_change: number
   }
+  bySource?: {
+    sheet: number
+    mera: number
+  }
 }
 
 interface DetailedRecord {
   id: string
   item_id: string
   google_sheet_id: string
+  source: "sheet" | "mera"
   status: string
   order_note: string | null
   designer: string | null
@@ -93,21 +101,59 @@ export default function CheckerPage() {
   const [serverTime, setServerTime] = useState<string>("")
   const [serverTimezone, setServerTimezone] = useState<string>("")
 
+  // === Bộ lọc nguồn / sheet / project / trạng thái hiện tại (giống need-repair) ===
+  const [selectedSheetIds, setSelectedSheetIds] = useState<string[]>([])
+  const [selectedCurrentStatuses, setSelectedCurrentStatuses] = useState<string[]>([])
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
+  const [includeSheet, setIncludeSheet] = useState(true)
+  const [includeMera, setIncludeMera] = useState(true)
+
+  const { data: sheetsResp } = useApi<{ data: Array<{ google_sheet_id: string; name?: string }> }>("/sheets")
+  const sheetOptions = useMemo(
+    () =>
+      (sheetsResp?.data ?? []).map((s) => ({
+        value: s.google_sheet_id,
+        label: s.name || s.google_sheet_id,
+      })),
+    [sheetsResp],
+  )
+  const statusOptions = useMemo(() => ALL_STATUSES.map((s) => ({ value: s, label: s })), [])
+  const { projects: meraProjects } = useMeraProjects()
+  const projectOptions = useMemo(
+    () => meraProjects.map((p) => ({ value: p.id, label: p.name })),
+    [meraProjects],
+  )
+
   const queryParams = useMemo(() => {
     const params = new URLSearchParams()
     params.append("timeRange", timeRange)
 
     if (timeRange === "custom" && customDateRange.from && customDateRange.to) {
+      // `to` từ Calendar là midnight ĐẦU ngày của ngày user chọn.
+      // Cộng 1 ngày để khoảng [from, to+1) bao gồm trọn ngày cuối (giống preset "Today").
+      const endExclusive = new Date(customDateRange.to.getTime() + 24 * 60 * 60 * 1000)
       params.append("startDate", customDateRange.from.toISOString())
-      params.append("endDate", customDateRange.to.toISOString())
+      params.append("endDate", endExclusive.toISOString())
     }
 
-    if (selectedReviewer) {
-      params.append("reviewerId", selectedReviewer)
-    }
+    if (selectedReviewer) params.append("reviewerId", selectedReviewer)
+    if (selectedSheetIds.length > 0) params.append("sheetIds", selectedSheetIds.join(","))
+    if (selectedCurrentStatuses.length > 0) params.append("currentStatuses", selectedCurrentStatuses.join(","))
+    if (selectedProjectIds.length > 0) params.append("projectIds", selectedProjectIds.join(","))
+    if (!includeSheet) params.append("includeSheet", "false")
+    if (!includeMera) params.append("includeMera", "false")
 
     return params.toString()
-  }, [timeRange, customDateRange, selectedReviewer])
+  }, [
+    timeRange,
+    customDateRange,
+    selectedReviewer,
+    selectedSheetIds,
+    selectedCurrentStatuses,
+    selectedProjectIds,
+    includeSheet,
+    includeMera,
+  ])
 
   const { data: statsData, loading, error, refetch } = useApi<CheckerStatsResponse>(`/checker/stats?${queryParams}`)
   const { data: serverTimeData } = useApi<{ success: boolean; data: { serverTime: string; serverTimezone: string } }>(
@@ -423,6 +469,77 @@ export default function CheckerPage() {
           </CardContent>
         </Card>
 
+        {/* Filters: Sheet / Mera projects / Trạng thái hiện tại / Source */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Filters</CardTitle>
+            <CardDescription>Lọc theo nguồn dữ liệu, sheet, project Mera, hoặc trạng thái hiện tại của đơn</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-gray-500 font-medium">Sheet</span>
+                <MultiSelect
+                  options={sheetOptions}
+                  value={selectedSheetIds}
+                  onChange={setSelectedSheetIds}
+                  placeholder="All sheets"
+                  className="w-56"
+                  emptyText="No sheets"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-gray-500 font-medium">Mera projects</span>
+                <MultiSelect
+                  options={projectOptions}
+                  value={selectedProjectIds}
+                  onChange={setSelectedProjectIds}
+                  placeholder="All projects"
+                  className="w-56"
+                  emptyText="No projects"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-gray-500 font-medium">Trạng thái hiện tại</span>
+                <MultiSelect
+                  options={statusOptions}
+                  value={selectedCurrentStatuses}
+                  onChange={setSelectedCurrentStatuses}
+                  placeholder="All statuses"
+                  className="w-56"
+                  emptyText="No statuses"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-gray-500 font-medium">Source</span>
+                <div className="flex gap-1 h-10 items-center">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={includeSheet ? "default" : "outline"}
+                    onClick={() => setIncludeSheet((v) => !v)}
+                    className={includeSheet ? "bg-pink-600 hover:bg-pink-700 text-white" : "bg-transparent"}
+                  >
+                    Sheet
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={includeMera ? "default" : "outline"}
+                    onClick={() => setIncludeMera((v) => !v)}
+                    className={includeMera ? "bg-pink-600 hover:bg-pink-700 text-white" : "bg-transparent"}
+                  >
+                    Mera
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {!selectedReviewer ? (
           <>
             {/* Summary Cards */}
@@ -623,6 +740,16 @@ export default function CheckerPage() {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="text-lg font-semibold text-gray-900">#{record.item_id}</div>
+                          <Badge
+                            variant="outline"
+                            className={
+                              record.source === "mera"
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            }
+                          >
+                            {record.source === "mera" ? "Mera" : "Sheet"}
+                          </Badge>
                           {getStatusBadge(record.status)}
                           {record.change_type && (
                             <Badge

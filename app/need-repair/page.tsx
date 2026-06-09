@@ -113,8 +113,11 @@ export default function NeedRepairPage() {
   const getApiUrl = () => {
     const params = new URLSearchParams({ timeRange })
     if (timeRange === "custom" && dateRange?.from && dateRange?.to) {
+      // `to` từ Calendar là midnight ĐẦU ngày của ngày user chọn.
+      // Cộng 1 ngày để khoảng [from, to+1) bao gồm trọn ngày cuối.
+      const endExclusive = new Date(dateRange.to.getTime() + 24 * 60 * 60 * 1000)
       params.set("startDate", dateRange.from.toISOString())
-      params.set("endDate", dateRange.to.toISOString())
+      params.set("endDate", endExclusive.toISOString())
     }
     if (selectedSheetIds.length > 0) params.set("sheetIds", selectedSheetIds.join(","))
     if (selectedCurrentStatuses.length > 0) params.set("currentStatuses", selectedCurrentStatuses.join(","))
@@ -485,7 +488,7 @@ export default function NeedRepairPage() {
                         Designer <SortIcon k="designer" />
                       </TableHead>
                       <TableHead onClick={() => toggleSort("orders")} className="text-center cursor-pointer select-none">
-                        Đơn cần sửa <SortIcon k="orders" />
+                        Design Error <SortIcon k="orders" />
                       </TableHead>
                       <TableHead
                         onClick={() => toggleSort("total_orders_processed")}
@@ -518,7 +521,7 @@ export default function NeedRepairPage() {
                         onClick={() => toggleSort("design_error")}
                         className="text-center cursor-pointer select-none"
                       >
-                        Design Errors <SortIcon k="design_error" />
+                        Total Design Error <SortIcon k="design_error" />
                       </TableHead>
                       <TableHead
                         onClick={() => toggleSort("customer_change")}
