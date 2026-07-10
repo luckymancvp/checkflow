@@ -25,6 +25,11 @@ export interface OrderReviewModalProps {
     orders: Order[]
   } | null
   isJumpLoading?: boolean // Added loading state for jump to order functionality
+  // Sync state passed through from the review page (not used by the modal yet)
+  syncStatus?: string
+  pendingChanges?: number
+  syncError?: string | null
+  onManualSync?: () => void
 }
 
 export type ViewMode = "tabs" | "stack" | "float"

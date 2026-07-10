@@ -1,4 +1,7 @@
-export const getImageUrl = (url: string | null, imageType: "design" | "mockup" | "other"): string | null => {
+export const getImageUrl = (
+  url: string | null | undefined,
+  imageType: "design" | "mockup" | "other",
+): string | null => {
   if (!url) return null
   // Return original URL - Google Drive links will be handled by the cache system
   return url

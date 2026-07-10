@@ -31,7 +31,7 @@ interface OrderDetailsPanelProps {
   productTypeNoteLoading: boolean
   productTypeNoteError: string | null
   refetchProductTypeNote: () => void
-  getCachedImageUrl: (url: string | null) => string | null
+  getCachedImageUrl: (url: string | null | undefined) => string | null
   onOrderUpdate?: () => void
 }
 

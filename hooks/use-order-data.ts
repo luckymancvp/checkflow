@@ -866,7 +866,7 @@ export function useOrderData(options?: { enabled?: boolean }) {
     // Get all designers including blank ones
     const allDesigners = orders.map((o) => o.designer)
     const hasBlankDesigner = allDesigners.some((d) => !d || d.trim() === "")
-    const nonBlankDesigners = [...new Set(allDesigners.filter((d) => d && d.trim() !== ""))]
+    const nonBlankDesigners = [...new Set(allDesigners.filter((d): d is string => !!d && d.trim() !== ""))]
 
     // Add blank designer option if there are orders with no designer
     const designers = hasBlankDesigner ? [BLANK_DESIGNER_VALUE, ...nonBlankDesigners] : nonBlankDesigners
@@ -874,8 +874,8 @@ export function useOrderData(options?: { enabled?: boolean }) {
     const options = {
       statuses: [...new Set(orders.map((o) => o.status))],
       designers,
-      productTypes: [...new Set(orders.map((o) => o.productType).filter(Boolean))],
-      stores: [...new Set(orders.map((o) => o.store).filter(Boolean))],
+      productTypes: [...new Set(orders.map((o) => o.productType).filter((p): p is string => !!p))],
+      stores: [...new Set(orders.map((o) => o.store).filter((s): s is string => !!s))],
     }
 
     return options

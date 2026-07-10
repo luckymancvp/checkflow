@@ -85,22 +85,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // Format the response data
     const formattedOrders =
-      historyData?.map((record) => ({
-        id: record.id,
-        orderId: record.order_id,
-        itemId: record.item_id,
-        designer: record.designer,
-        changeType: record.change_type,
-        issueDescription: record.order_note,
-        createdAt: record.created_at,
-        createdBy: record.created_by_user
-          ? {
-              id: record.created_by_user.id,
-              name: record.created_by_user.name,
-              email: record.created_by_user.email,
-            }
-          : null,
-      })) || []
+      historyData?.map((record) => {
+        // Supabase types joined relations as arrays even for to-one joins
+        const creator = Array.isArray(record.created_by_user)
+          ? record.created_by_user[0]
+          : record.created_by_user
+        return {
+          id: record.id,
+          orderId: record.order_id,
+          itemId: record.item_id,
+          designer: record.designer,
+          changeType: record.change_type,
+          issueDescription: record.order_note,
+          createdAt: record.created_at,
+          createdBy: creator
+            ? {
+                id: creator.id,
+                name: creator.name,
+                email: creator.email,
+              }
+            : null,
+        }
+      }) || []
 
     logServerInfo("Product history fetched successfully", {
       userId: appUser.sub,
