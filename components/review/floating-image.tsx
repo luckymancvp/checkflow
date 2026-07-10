@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { LazyImage } from "@/components/ui/lazy-image"
-import { ExternalLink, ZoomIn, ZoomOut, Maximize2, Grid3x3, Layers } from "lucide-react"
+import { ExternalLink, ZoomIn, ZoomOut, Maximize2, Grid3x3, Layers, ChevronLeft, ChevronRight } from "lucide-react"
 import type { Order } from "@/types/order"
 import type { ActiveTab } from "@/types/order-review"
 import { getImageUrl } from "@/utils/image-utils"
@@ -13,6 +13,9 @@ interface FloatingImageProps {
   order: Order
   activeTab: ActiveTab
   getCachedImageUrl: (url: string | null) => string | null
+  designUrls?: string[]
+  designIndex?: number
+  setDesignIndex?: (index: number) => void
 }
 
 const FLOAT_SETTINGS_KEY = "orderReviewFloatSettings"
@@ -42,7 +45,16 @@ const DEFAULT_SETTINGS: FloatSettings = {
   zoom: 1,
 }
 
-export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingImageProps) {
+export function FloatingImage({
+  order,
+  activeTab,
+  getCachedImageUrl,
+  designUrls = [],
+  designIndex = 0,
+  setDesignIndex,
+}: FloatingImageProps) {
+  const safeDesignIndex = designUrls.length > 0 ? Math.min(designIndex, designUrls.length - 1) : 0
+  const currentDesignUrl = designUrls[safeDesignIndex] ?? order.designLink ?? null
   const [perProductTypeMode, setPerProductTypeMode] = useState(() => {
     try {
       const saved = localStorage.getItem(FLOAT_MODE_KEY)
@@ -128,7 +140,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
   useEffect(() => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
-  }, [activeTab, order.itemId])
+  }, [activeTab, order.itemId, safeDesignIndex])
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -265,7 +277,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
       case "mockup":
         return getCachedImageUrl(getImageUrl(order.mockup, "mockup"))
       case "design":
-        return getCachedImageUrl(getImageUrl(order.designLink, "design"))
+        return getCachedImageUrl(currentDesignUrl)
       case "customer":
         return getImageUrl(order.customerImage, "other")
       default:
@@ -280,7 +292,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
       case "mockup":
         return order.mockup
       case "design":
-        return order.designLink
+        return currentDesignUrl
       case "customer":
         return order.customerImage
       default:
@@ -312,6 +324,31 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
           <span className="text-sm font-medium text-gray-700 capitalize">{activeTab}</span>
+          {activeTab === "design" && designUrls.length > 1 && setDesignIndex && (
+            <div className="flex items-center gap-1 ml-1" onMouseDown={(e) => e.stopPropagation()}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDesignIndex((safeDesignIndex - 1 + designUrls.length) % designUrls.length)}
+                className="h-6 w-6 p-0 hover:bg-gray-200"
+                title="Previous design"
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+              <span className="text-xs text-gray-600 tabular-nums">
+                {safeDesignIndex + 1}/{designUrls.length}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDesignIndex((safeDesignIndex + 1) % designUrls.length)}
+                className="h-6 w-6 p-0 hover:bg-gray-200"
+                title="Next design"
+              >
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -405,7 +442,7 @@ export function FloatingImage({ order, activeTab, getCachedImageUrl }: FloatingI
           className="flex items-center justify-center"
         >
           <LazyImage
-            key={`${order.itemId}-${activeTab}-float`}
+            key={`${order.itemId}-${activeTab}-${activeTab === "design" ? safeDesignIndex : 0}-float`}
             src={imageSrc}
             alt={activeTab}
             className="max-w-full max-h-full object-contain select-none"

@@ -4,7 +4,7 @@ import type React from "react"
 import { useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { LazyImage } from "@/components/ui/lazy-image"
-import { RotateCw, Camera, ExternalLink } from "lucide-react"
+import { RotateCw, Camera, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react"
 import type { Order } from "@/types/order"
 import type { ViewMode, ActiveTab } from "@/types/order-review"
 import { getImageUrl } from "@/utils/image-utils"
@@ -33,6 +33,9 @@ interface ImageViewerProps {
   setScreenshotTaken: (taken: boolean) => void
   getCachedImageUrl: (url: string | null) => string | null
   onScreenshot?: () => void
+  designUrls: string[]
+  designIndex: number
+  setDesignIndex: (index: number) => void
 }
 
 export function ImageViewer({
@@ -58,8 +61,41 @@ export function ImageViewer({
   setScreenshotTaken,
   getCachedImageUrl,
   onScreenshot,
+  designUrls,
+  designIndex,
+  setDesignIndex,
 }: ImageViewerProps) {
   const imageContainerRef = useRef<HTMLDivElement>(null)
+
+  const safeDesignIndex = designUrls.length > 0 ? Math.min(designIndex, designUrls.length - 1) : 0
+  const currentDesignUrl = designUrls[safeDesignIndex] ?? order.designLink ?? null
+
+  const goToPreviousDesign = () =>
+    setDesignIndex((safeDesignIndex - 1 + designUrls.length) % designUrls.length)
+  const goToNextDesign = () => setDesignIndex((safeDesignIndex + 1) % designUrls.length)
+
+  const renderDesignNav = () =>
+    designUrls.length > 1 ? (
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/75 text-white rounded-full px-2 py-1 z-10">
+        <button
+          onClick={goToPreviousDesign}
+          className="p-1 hover:bg-white/20 rounded-full transition-colors"
+          title="Previous design"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="text-xs font-medium tabular-nums">
+          {safeDesignIndex + 1} / {designUrls.length}
+        </span>
+        <button
+          onClick={goToNextDesign}
+          className="p-1 hover:bg-white/20 rounded-full transition-colors"
+          title="Next design"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    ) : null
 
   useEffect(() => {
     const container = imageContainerRef.current
@@ -200,8 +236,8 @@ export function ImageViewer({
       {
         key: "design" as ActiveTab,
         label: "Design",
-        src: getImageUrl(order.designLink, "design"),
-        available: !!order.designLink,
+        src: getCachedImageUrl(currentDesignUrl),
+        available: designUrls.length > 0 || !!order.designLink,
       },
       {
         key: "customer" as ActiveTab,
@@ -264,7 +300,7 @@ export function ImageViewer({
                   }}
                 >
                   <LazyImage
-                    key={`${order.itemId}-${activeImage.key}`}
+                    key={`${order.itemId}-${activeImage.key}${activeImage.key === "design" ? `-${safeDesignIndex}` : ""}`}
                     src={activeImage.src}
                     alt={activeImage.label}
                     className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
@@ -290,11 +326,11 @@ export function ImageViewer({
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   )}
-                  {activeTab === "design" && order.designLink && (
+                  {activeTab === "design" && currentDesignUrl && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => window.open(order.designLink, "_blank")}
+                      onClick={() => window.open(currentDesignUrl, "_blank")}
                       className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
                       title="Open design in new tab"
                     >
@@ -324,6 +360,8 @@ export function ImageViewer({
                     />
                   </Button>
                 </div>
+
+                {activeTab === "design" && renderDesignNav()}
 
                 {zoom > 100 && (
                   <div className="absolute bottom-4 left-4 bg-black/75 text-white text-xs px-2 py-1 rounded">
@@ -355,8 +393,8 @@ export function ImageViewer({
       {
         key: "design" as ActiveTab,
         label: "Design",
-        src: getImageUrl(order.designLink, "design"),
-        available: !!order.designLink,
+        src: getCachedImageUrl(currentDesignUrl),
+        available: designUrls.length > 0 || !!order.designLink,
       },
       {
         key: "customer" as ActiveTab,
@@ -419,7 +457,7 @@ export function ImageViewer({
                   }}
                 >
                   <LazyImage
-                    key={`${order.itemId}-${activeImage.key}`}
+                    key={`${order.itemId}-${activeImage.key}${activeImage.key === "design" ? `-${safeDesignIndex}` : ""}`}
                     src={activeImage.src}
                     alt={activeImage.label}
                     className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
@@ -445,11 +483,11 @@ export function ImageViewer({
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   )}
-                  {activeTab === "design" && order.designLink && (
+                  {activeTab === "design" && currentDesignUrl && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => window.open(order.designLink, "_blank")}
+                      onClick={() => window.open(currentDesignUrl, "_blank")}
                       className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
                       title="Open design in new tab"
                     >
@@ -480,6 +518,8 @@ export function ImageViewer({
                   </Button>
                 </div>
 
+                {activeTab === "design" && renderDesignNav()}
+
                 {zoom > 100 && (
                   <div className="absolute bottom-4 left-4 bg-black/75 text-white text-xs px-2 py-1 rounded">
                     Drag to pan • Scroll to zoom
@@ -490,7 +530,16 @@ export function ImageViewer({
           })()}
         </div>
 
-        {order.designLink && <FloatingImage order={order} activeTab="design" getCachedImageUrl={getCachedImageUrl} />}
+        {(designUrls.length > 0 || order.designLink) && (
+          <FloatingImage
+            order={order}
+            activeTab="design"
+            getCachedImageUrl={getCachedImageUrl}
+            designUrls={designUrls}
+            designIndex={safeDesignIndex}
+            setDesignIndex={setDesignIndex}
+          />
+        )}
       </div>
     )
   }
@@ -507,11 +556,19 @@ export function ImageViewer({
         src: getCachedImageUrl(getImageUrl(order.mockup, "mockup")),
         originalSrc: order.mockup,
       },
-      {
-        label: "Design Image",
-        src: getImageUrl(order.designLink, "design"),
-        originalSrc: order.designLink,
-      },
+      ...(designUrls.length > 0
+        ? designUrls.map((url, i) => ({
+            label: designUrls.length > 1 ? `Design Image ${i + 1}` : "Design Image",
+            src: getCachedImageUrl(url),
+            originalSrc: url,
+          }))
+        : [
+            {
+              label: "Design Image",
+              src: getImageUrl(order.designLink, "design"),
+              originalSrc: order.designLink,
+            },
+          ]),
       {
         label: "Customer Image",
         src: getImageUrl(order.customerImage, "other"),

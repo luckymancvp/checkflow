@@ -5,6 +5,7 @@ import type { Order } from "@/types/order"
 import { getImageUrl } from "@/utils/image-utils"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import { GoogleDriveClient } from "@/lib/google-drive-client"
+import { resolveDesignUrls } from "@/utils/design-links"
 
 export function useImageCache() {
   const [imageCache, setImageCache] = useState<Map<string, string>>(new Map())
@@ -32,11 +33,15 @@ export function useImageCache() {
   const preloadOrderImages = useCallback(
     async (orderToPreload: Order) => {
       const mockupUrl = getImageUrl(orderToPreload.mockup, "mockup")
-      const designUrl = getImageUrl(orderToPreload.designLink, "design")
+      // designLink can hold multiple URLs and/or folder links — expand to individual files
+      const designUrls = await resolveDesignUrls(orderToPreload.designLink).catch((error) => {
+        console.error("[useImageCache] Failed to resolve design links:", error)
+        return [] as string[]
+      })
 
       const imagesToPreload = [
         { url: mockupUrl, type: "mockup" },
-        { url: designUrl, type: "design" },
+        ...designUrls.map((url) => ({ url, type: "design" })),
       ]
 
       for (const { url, type } of imagesToPreload) {
