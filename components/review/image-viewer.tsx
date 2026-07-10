@@ -36,6 +36,9 @@ interface ImageViewerProps {
   designUrls: string[]
   designIndex: number
   setDesignIndex: (index: number) => void
+  mockupUrls: string[]
+  mockupIndex: number
+  setMockupIndex: (index: number) => void
 }
 
 export function ImageViewer({
@@ -64,6 +67,9 @@ export function ImageViewer({
   designUrls,
   designIndex,
   setDesignIndex,
+  mockupUrls,
+  mockupIndex,
+  setMockupIndex,
 }: ImageViewerProps) {
   const imageContainerRef = useRef<HTMLDivElement>(null)
 
@@ -74,28 +80,70 @@ export function ImageViewer({
     setDesignIndex((safeDesignIndex - 1 + designUrls.length) % designUrls.length)
   const goToNextDesign = () => setDesignIndex((safeDesignIndex + 1) % designUrls.length)
 
-  const renderDesignNav = () =>
-    designUrls.length > 1 ? (
+  const safeMockupIndex = mockupUrls.length > 0 ? Math.min(mockupIndex, mockupUrls.length - 1) : 0
+  const currentMockupUrl = mockupUrls[safeMockupIndex] ?? order.mockup ?? null
+
+  const goToPreviousMockup = () =>
+    setMockupIndex((safeMockupIndex - 1 + mockupUrls.length) % mockupUrls.length)
+  const goToNextMockup = () => setMockupIndex((safeMockupIndex + 1) % mockupUrls.length)
+
+  // Bottom-center pager shown inside the image area
+  const renderBottomNav = (label: string, index: number, count: number, onPrev: () => void, onNext: () => void) =>
+    count > 1 ? (
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/75 text-white rounded-full px-2 py-1 z-10">
         <button
-          onClick={goToPreviousDesign}
+          onClick={onPrev}
           className="p-1 hover:bg-white/20 rounded-full transition-colors"
-          title="Previous design"
+          title={`Previous ${label}`}
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="text-xs font-medium tabular-nums">
-          {safeDesignIndex + 1} / {designUrls.length}
+          {index + 1} / {count}
         </span>
         <button
-          onClick={goToNextDesign}
+          onClick={onNext}
           className="p-1 hover:bg-white/20 rounded-full transition-colors"
-          title="Next design"
+          title={`Next ${label}`}
         >
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     ) : null
+
+  // Compact pager for the top-right toolbar
+  const renderToolbarNav = (
+    label: string,
+    shortLabel: string,
+    index: number,
+    count: number,
+    onPrev: () => void,
+    onNext: () => void,
+  ) => (
+    <div className="flex items-center gap-0.5 bg-white/95 backdrop-blur-sm shadow-md border border-gray-200 rounded-md px-1">
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onPrev}
+        className="h-8 w-8 p-0 hover:bg-gray-100"
+        title={`Previous ${label}`}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="text-xs font-medium text-gray-700 tabular-nums px-0.5 select-none">
+        {shortLabel} {index + 1}/{count}
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onNext}
+        className="h-8 w-8 p-0 hover:bg-gray-100"
+        title={`Next ${label}`}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  )
 
   useEffect(() => {
     const container = imageContainerRef.current
@@ -230,8 +278,8 @@ export function ImageViewer({
       {
         key: "mockup" as ActiveTab,
         label: "Mockup",
-        src: getCachedImageUrl(getImageUrl(order.mockup, "mockup")),
-        available: !!order.mockup,
+        src: getCachedImageUrl(currentMockupUrl),
+        available: mockupUrls.length > 0 || !!order.mockup,
       },
       {
         key: "design" as ActiveTab,
@@ -300,7 +348,7 @@ export function ImageViewer({
                   }}
                 >
                   <LazyImage
-                    key={`${order.itemId}-${activeImage.key}${activeImage.key === "design" ? `-${safeDesignIndex}` : ""}`}
+                    key={`${order.itemId}-${activeImage.key}${activeImage.key === "design" ? `-${safeDesignIndex}` : activeImage.key === "mockup" ? `-${safeMockupIndex}` : ""}`}
                     src={activeImage.src}
                     alt={activeImage.label}
                     className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
@@ -315,11 +363,16 @@ export function ImageViewer({
                 </div>
 
                 <div className="absolute top-4 right-4 flex gap-2 z-10">
-                  {activeTab === "mockup" && order.mockup && (
+                  {activeTab === "mockup" &&
+                    mockupUrls.length > 1 &&
+                    renderToolbarNav("mockup", "M", safeMockupIndex, mockupUrls.length, goToPreviousMockup, goToNextMockup)}
+                  {designUrls.length > 1 &&
+                    renderToolbarNav("design", "D", safeDesignIndex, designUrls.length, goToPreviousDesign, goToNextDesign)}
+                  {activeTab === "mockup" && currentMockupUrl && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => window.open(order.mockup, "_blank")}
+                      onClick={() => window.open(currentMockupUrl, "_blank")}
                       className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
                       title="Open mockup in new tab"
                     >
@@ -361,7 +414,10 @@ export function ImageViewer({
                   </Button>
                 </div>
 
-                {activeTab === "design" && renderDesignNav()}
+                {activeTab === "design" &&
+                  renderBottomNav("design", safeDesignIndex, designUrls.length, goToPreviousDesign, goToNextDesign)}
+                {activeTab === "mockup" &&
+                  renderBottomNav("mockup", safeMockupIndex, mockupUrls.length, goToPreviousMockup, goToNextMockup)}
 
                 {zoom > 100 && (
                   <div className="absolute bottom-4 left-4 bg-black/75 text-white text-xs px-2 py-1 rounded">
@@ -387,8 +443,8 @@ export function ImageViewer({
       {
         key: "mockup" as ActiveTab,
         label: "Mockup",
-        src: getCachedImageUrl(getImageUrl(order.mockup, "mockup")),
-        available: !!order.mockup,
+        src: getCachedImageUrl(currentMockupUrl),
+        available: mockupUrls.length > 0 || !!order.mockup,
       },
       {
         key: "design" as ActiveTab,
@@ -457,7 +513,7 @@ export function ImageViewer({
                   }}
                 >
                   <LazyImage
-                    key={`${order.itemId}-${activeImage.key}${activeImage.key === "design" ? `-${safeDesignIndex}` : ""}`}
+                    key={`${order.itemId}-${activeImage.key}${activeImage.key === "design" ? `-${safeDesignIndex}` : activeImage.key === "mockup" ? `-${safeMockupIndex}` : ""}`}
                     src={activeImage.src}
                     alt={activeImage.label}
                     className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
@@ -472,11 +528,16 @@ export function ImageViewer({
                 </div>
 
                 <div className="absolute top-4 right-4 flex gap-2 z-10">
-                  {activeTab === "mockup" && order.mockup && (
+                  {activeTab === "mockup" &&
+                    mockupUrls.length > 1 &&
+                    renderToolbarNav("mockup", "M", safeMockupIndex, mockupUrls.length, goToPreviousMockup, goToNextMockup)}
+                  {designUrls.length > 1 &&
+                    renderToolbarNav("design", "D", safeDesignIndex, designUrls.length, goToPreviousDesign, goToNextDesign)}
+                  {activeTab === "mockup" && currentMockupUrl && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => window.open(order.mockup, "_blank")}
+                      onClick={() => window.open(currentMockupUrl, "_blank")}
                       className="bg-white/95 backdrop-blur-sm shadow-md hover:bg-white border-gray-200"
                       title="Open mockup in new tab"
                     >
@@ -518,7 +579,10 @@ export function ImageViewer({
                   </Button>
                 </div>
 
-                {activeTab === "design" && renderDesignNav()}
+                {activeTab === "design" &&
+                  renderBottomNav("design", safeDesignIndex, designUrls.length, goToPreviousDesign, goToNextDesign)}
+                {activeTab === "mockup" &&
+                  renderBottomNav("mockup", safeMockupIndex, mockupUrls.length, goToPreviousMockup, goToNextMockup)}
 
                 {zoom > 100 && (
                   <div className="absolute bottom-4 left-4 bg-black/75 text-white text-xs px-2 py-1 rounded">
@@ -538,6 +602,8 @@ export function ImageViewer({
             designUrls={designUrls}
             designIndex={safeDesignIndex}
             setDesignIndex={setDesignIndex}
+            mockupUrls={mockupUrls}
+            mockupIndex={safeMockupIndex}
           />
         )}
       </div>
@@ -551,11 +617,19 @@ export function ImageViewer({
         src: getImageUrl(order.productImage, "other"),
         originalSrc: order.productImage,
       },
-      {
-        label: "Mockup Image",
-        src: getCachedImageUrl(getImageUrl(order.mockup, "mockup")),
-        originalSrc: order.mockup,
-      },
+      ...(mockupUrls.length > 0
+        ? mockupUrls.map((url, i) => ({
+            label: mockupUrls.length > 1 ? `Mockup Image ${i + 1}` : "Mockup Image",
+            src: getCachedImageUrl(url),
+            originalSrc: url,
+          }))
+        : [
+            {
+              label: "Mockup Image",
+              src: getCachedImageUrl(getImageUrl(order.mockup, "mockup")),
+              originalSrc: order.mockup,
+            },
+          ]),
       ...(designUrls.length > 0
         ? designUrls.map((url, i) => ({
             label: designUrls.length > 1 ? `Design Image ${i + 1}` : "Design Image",

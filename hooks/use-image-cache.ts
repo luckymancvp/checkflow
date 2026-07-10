@@ -32,15 +32,20 @@ export function useImageCache() {
 
   const preloadOrderImages = useCallback(
     async (orderToPreload: Order) => {
-      const mockupUrl = getImageUrl(orderToPreload.mockup, "mockup")
-      // designLink can hold multiple URLs and/or folder links — expand to individual files
-      const designUrls = await resolveDesignUrls(orderToPreload.designLink).catch((error) => {
-        console.error("[useImageCache] Failed to resolve design links:", error)
-        return [] as string[]
-      })
+      // Both mockup and designLink can hold multiple URLs and/or folder links — expand to individual files
+      const [mockupUrls, designUrls] = await Promise.all([
+        resolveDesignUrls(orderToPreload.mockup).catch((error) => {
+          console.error("[useImageCache] Failed to resolve mockup links:", error)
+          return [] as string[]
+        }),
+        resolveDesignUrls(orderToPreload.designLink).catch((error) => {
+          console.error("[useImageCache] Failed to resolve design links:", error)
+          return [] as string[]
+        }),
+      ])
 
       const imagesToPreload = [
-        { url: mockupUrl, type: "mockup" },
+        ...mockupUrls.map((url) => ({ url, type: "mockup" })),
         ...designUrls.map((url) => ({ url, type: "design" })),
       ]
 
