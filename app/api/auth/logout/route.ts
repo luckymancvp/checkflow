@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         {
           user_id: userId,
           event_type: "logout",
-          ip_address: request.ip,
+          ip_address: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
           user_agent: request.headers.get("user-agent"),
           success: true,
         },

@@ -67,7 +67,7 @@ export function useImageCache() {
   )
 
   const getCachedImageUrl = useCallback(
-    (originalUrl: string | null): string | null => {
+    (originalUrl: string | null | undefined): string | null => {
       if (!originalUrl) return null
 
       const cachedUrl = imageCache.get(originalUrl) || null

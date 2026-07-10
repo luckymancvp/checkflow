@@ -95,11 +95,11 @@ export function useOrderComments(itemId: string) {
     const ably = getAblyBrowserClient()
     const channel = ably.channels.get(`order-comments:${itemId}`)
 
-    const handleCommentMessage = (message: { name: string; data: OrderComment }) => {
+    const handleCommentMessage = (message: { name?: string; data?: any }) => {
       console.log("[useOrderComments] Real-time update:", message)
 
       if (message.name === "comment:new") {
-        const newComment = message.data
+        const newComment = message.data as OrderComment
         setComments((prev) => {
           const exists = prev.some((c) => c.id === newComment.id)
           if (exists) return prev
@@ -114,10 +114,10 @@ export function useOrderComments(itemId: string) {
           })
         }
       } else if (message.name === "comment:update") {
-        const updatedComment = message.data
+        const updatedComment = message.data as OrderComment
         setComments((prev) => prev.map((c) => (c.id === updatedComment.id ? updatedComment : c)))
       } else if (message.name === "comment:delete") {
-        const deletedComment = message.data
+        const deletedComment = message.data as OrderComment
         setComments((prev) => prev.filter((c) => c.id !== deletedComment.id))
       }
     }

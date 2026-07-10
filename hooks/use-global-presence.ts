@@ -98,17 +98,13 @@ export function useGlobalPresence(enabled = true) {
 
     channel.presence.subscribe(handlePresenceUpdate)
 
-    channel.presence.get((err, members) => {
-      if (err) {
-        console.error("[useGlobalPresence] Error getting presence:", err)
-        setLoading(false)
-        return
-      }
-
+    channel.presence
+      .get()
+      .then((members) => {
       const initialUsers: GlobalUserPresence[] =
         members
-          ?.filter((m) => m.data?.user_email !== user.email)
-          .map((m) => ({
+          ?.filter((m: any) => m.data?.user_email !== user.email)
+          .map((m: any) => ({
             id: m.clientId || m.data.user_email,
             user_id: m.data.user_id,
             user_email: m.data.user_email,
@@ -120,7 +116,11 @@ export function useGlobalPresence(enabled = true) {
 
       setOnlineUsers(initialUsers)
       setLoading(false)
-    })
+      })
+      .catch((err) => {
+        console.error("[useGlobalPresence] Error getting presence:", err)
+        setLoading(false)
+      })
 
     enterPresence()
 

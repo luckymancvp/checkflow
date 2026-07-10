@@ -12,7 +12,7 @@ import { getImageUrl } from "@/utils/image-utils"
 interface FloatingImageProps {
   order: Order
   activeTab: ActiveTab
-  getCachedImageUrl: (url: string | null) => string | null
+  getCachedImageUrl: (url: string | null | undefined) => string | null
   designUrls?: string[]
   designIndex?: number
   setDesignIndex?: (index: number) => void

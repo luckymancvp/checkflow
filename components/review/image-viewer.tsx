@@ -16,7 +16,7 @@ interface ImageViewerProps {
   activeTab: ActiveTab
   setActiveTab: (tab: ActiveTab) => void
   zoom: number
-  setZoom: (zoom: number) => void
+  setZoom: React.Dispatch<React.SetStateAction<number>>
   rotation: number
   setRotation: (rotation: number) => void
   panX: number
@@ -31,7 +31,7 @@ interface ImageViewerProps {
   setDragStartPan: (start: { x: number; y: number }) => void
   screenshotTaken: boolean
   setScreenshotTaken: (taken: boolean) => void
-  getCachedImageUrl: (url: string | null) => string | null
+  getCachedImageUrl: (url: string | null | undefined) => string | null
   onScreenshot?: () => void
   designUrls: string[]
   designIndex: number

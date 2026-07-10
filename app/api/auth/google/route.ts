@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const stateData = {
       timestamp: Date.now(),
       nonce: crypto.randomBytes(16).toString("hex"),
-      ip: request.ip || "unknown",
+      ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
     }
 
     const secret = new TextEncoder().encode(JWT_SECRET)
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     logServerInfo("OAuth initiation successful", {
       redirectUri,
-      ip: request.ip,
+      ip: stateData.ip,
       nonce: stateData.nonce,
       googleAuthUrl: googleAuthUrl.toString(),
     })
