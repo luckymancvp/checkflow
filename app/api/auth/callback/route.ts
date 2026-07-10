@@ -313,7 +313,7 @@ export async function GET(request: NextRequest) {
         {
           user_id: appUser.id,
           event_type: "login",
-          ip_address: request.ip,
+          ip_address: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
           user_agent: request.headers.get("user-agent"),
           success: true,
         },

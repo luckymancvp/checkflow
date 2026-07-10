@@ -8,6 +8,7 @@ export interface Order {
   designer?: string
   designLink?: string
   mockup?: string
+  mockupLink?: string // Legacy field kept for backward compatibility with older sheet data
   customerImage?: string
   personalization?: string
   date?: string

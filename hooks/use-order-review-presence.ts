@@ -107,17 +107,13 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
 
     channel.presence.subscribe(handlePresenceUpdate)
 
-    channel.presence.get((err, members) => {
-      if (err) {
-        console.error("[useOrderReviewPresence] Error getting presence:", err)
-        setLoading(false)
-        return
-      }
-
+    channel.presence
+      .get()
+      .then((members) => {
       const initialUsers: UserPresence[] =
         members
-          ?.filter((m) => m.data?.user_email !== user.email)
-          .map((m) => ({
+          ?.filter((m: any) => m.data?.user_email !== user.email)
+          .map((m: any) => ({
             id: m.clientId || m.data.user_email,
             order_item_id: m.data.order_item_id,
             user_id: m.data.user_id,
@@ -130,7 +126,11 @@ export function useOrderReviewPresence(itemId: string, enabled = true) {
 
       setReviewingUsers(initialUsers)
       setLoading(false)
-    })
+      })
+      .catch((err) => {
+        console.error("[useOrderReviewPresence] Error getting presence:", err)
+        setLoading(false)
+      })
 
     enterPresence()
 

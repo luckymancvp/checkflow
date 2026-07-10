@@ -58,7 +58,7 @@ export default function DesignerDetailPage() {
     return `/need-repair/designer/${encodeURIComponent(designer)}?${urlParams.toString()}`
   }
 
-  const { data: designerData, loading, error, refetch } = useApi(getApiUrl())
+  const { data: designerData, loading, error, refetch } = useApi<any>(getApiUrl())
 
   const handleTimeRangeChange = (value: TimeRange) => {
     setTimeRange(value)

@@ -22,13 +22,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, ChevronDown, Zap, FileText, Eye, AlertTriangle, ScrollText, CheckCircle } from "lucide-react" // Added CheckCircle icon
+import { LogOut, ChevronDown, Zap, FileText, Eye, AlertTriangle, ScrollText, CheckCircle, type LucideIcon } from "lucide-react" // Added CheckCircle icon
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, usePathname } from "next/navigation"
 import { Settings, HelpCircle } from "lucide-react"
 
-const navigationItems = [
+const navigationItems: Array<{
+  title: string
+  url: string
+  icon: LucideIcon
+  badge?: string
+}> = [
   {
     title: "Sheets",
     url: "/sheets",

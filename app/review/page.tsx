@@ -77,7 +77,7 @@ export default function ReviewPage() {
     })
     const allDesigners = meraOrders.map((o) => o.designer)
     const hasBlank = allDesigners.some((d) => !d || d.trim() === "")
-    const nonBlank = [...new Set(allDesigners.filter((d) => d && d.trim() !== ""))]
+    const nonBlank = [...new Set(allDesigners.filter((d): d is string => !!d && d.trim() !== ""))]
     const designers = hasBlank ? ["[Blank]", ...nonBlank] : nonBlank
     return {
       statuses,
@@ -229,10 +229,10 @@ export default function ReviewPage() {
         return false
       }
       // Skip designer filter when calculating designer counts
-      if (filters.productType && filters.productType.length > 0 && !filters.productType.includes(order.productType)) {
+      if (filters.productType && filters.productType.length > 0 && !filters.productType.includes(order.productType ?? "")) {
         return false
       }
-      if (filters.store && filters.store.length > 0 && !filters.store.includes(order.store)) {
+      if (filters.store && filters.store.length > 0 && !filters.store.includes(order.store ?? "")) {
         return false
       }
       if (filters.searchQuery) {
@@ -270,11 +270,11 @@ export default function ReviewPage() {
         if (orderHasBlankDesigner) {
           if (!hasBlankFilter) return false
         } else {
-          if (!otherDesigners.includes(order.designer)) return false
+          if (!otherDesigners.includes(order.designer ?? "")) return false
         }
       }
       // Skip productType filter when calculating productType counts
-      if (filters.store && filters.store.length > 0 && !filters.store.includes(order.store)) {
+      if (filters.store && filters.store.length > 0 && !filters.store.includes(order.store ?? "")) {
         return false
       }
       if (filters.searchQuery) {
@@ -312,10 +312,10 @@ export default function ReviewPage() {
         if (orderHasBlankDesigner) {
           if (!hasBlankFilter) return false
         } else {
-          if (!otherDesigners.includes(order.designer)) return false
+          if (!otherDesigners.includes(order.designer ?? "")) return false
         }
       }
-      if (filters.productType && filters.productType.length > 0 && !filters.productType.includes(order.productType)) {
+      if (filters.productType && filters.productType.length > 0 && !filters.productType.includes(order.productType ?? "")) {
         return false
       }
       // Skip store filter when calculating store counts

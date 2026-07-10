@@ -127,7 +127,7 @@ export default function NeedRepairPage() {
     return `/need-repair/stats?${params.toString()}`
   }
 
-  const { data: stats, loading, error, refetch } = useApi(getApiUrl())
+  const { data: stats, loading, error, refetch } = useApi<any>(getApiUrl())
 
   const handleTimeRangeChange = (value: TimeRange) => {
     setTimeRange(value)

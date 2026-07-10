@@ -72,7 +72,8 @@ export function SheetSelectionStep({
 
       const metadata: SheetMetadata = response.data
       setSheetMetadata(metadata)
-      updateConfiguration({ sheetMetadata: metadata })
+      // Configuration expects a flattened shape ({ title, sheets }) rather than the raw API metadata
+      updateConfiguration({ sheetMetadata: { title: metadata.properties.title, sheets: metadata.sheets } })
 
       if (!configuration.selectedTab && metadata.sheets.length > 0) {
         const orderTab = metadata.sheets.find((sheet) => sheet.properties.title.toLowerCase() === "order")

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, type CSSProperties } from "react"
 import { cn } from "@/lib/utils"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import { GoogleDriveClient } from "@/lib/google-drive-client"
@@ -9,8 +9,10 @@ interface LazyImageProps {
   src: string
   alt: string
   className?: string
+  style?: CSSProperties
   fallbackSrc?: string
   placeholder?: string
+  draggable?: boolean
   onLoad?: () => void
   onError?: () => void
   onClick?: () => void
@@ -20,8 +22,10 @@ export function LazyImage({
   src,
   alt,
   className,
+  style,
   fallbackSrc = "/placeholder.svg?height=48&width=48&text=Image",
   placeholder = "/placeholder.svg?height=48&width=48&text=Loading",
+  draggable,
   onLoad,
   onError,
   onClick,
@@ -106,7 +110,7 @@ export function LazyImage({
   }
 
   return (
-    <div ref={imgRef} className={cn("relative overflow-hidden", className)} onClick={onClick}>
+    <div ref={imgRef} className={cn("relative overflow-hidden", className)} style={style} onClick={onClick}>
       {!isInView ? (
         <img
           src={placeholder || "/placeholder.svg"}
@@ -130,6 +134,7 @@ export function LazyImage({
                 "w-full h-full object-cover transition-opacity duration-300",
                 isLoaded ? "opacity-100" : "opacity-0",
               )}
+              draggable={draggable}
               onLoad={handleLoad}
               onError={handleError}
             />

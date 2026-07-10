@@ -11,6 +11,7 @@ import { ALL_STATUSES } from "@/constants/statuses"
 import { LazyImage } from "@/components/ui/lazy-image"
 import { useApi } from "@/hooks/use-api"
 import { useImageCache } from "@/hooks/use-image-cache"
+import { useDesignLinks } from "@/hooks/use-design-links"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
 import {
   X,
@@ -98,6 +99,8 @@ export function OrderReviewModal({
   const prefetchInProgressRef = useRef(false)
 
   const { preloadOrderImages, getCachedImageUrl } = useImageCache()
+  const designUrls = useDesignLinks(order.designLink)
+  const [designIndex, setDesignIndex] = useState(0)
 
   const { reviewingUsers, setTypingStatus } = useOrderReviewPresence(order.itemId, isOpen)
   // const { onlineUsers } = useGlobalPresence(isOpen)
@@ -227,6 +230,7 @@ export function OrderReviewModal({
     setShowRepairOptions(false)
     setZoom(100)
     setActiveTab("mockup")
+    setDesignIndex(0)
     setPanX(0)
     setPanY(0)
     setRotation(0)
@@ -1169,6 +1173,9 @@ export function OrderReviewModal({
                   setScreenshotTaken={setScreenshotTaken}
                   getCachedImageUrl={getCachedImageUrl}
                   onScreenshot={handleScreenshot}
+                  designUrls={designUrls}
+                  designIndex={designIndex}
+                  setDesignIndex={setDesignIndex}
                 />
               </div>
             </div>

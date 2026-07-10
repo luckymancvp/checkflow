@@ -22,26 +22,26 @@ export default function TestPage() {
     loading: historyLoading,
     error: historyError,
     refetch: refetchHistory,
-  } = useApi(`/orders/${ITEM_ID}/history`)
+  } = useApi<any>(`/orders/${ITEM_ID}/history`)
 
-  const { mutate: updateReviewAccuracy, loading: accuracyLoading } = useApiMutation(
-    selectedHistoryId ? `/orders/history/${selectedHistoryId}/review-accuracy` : "",
-    {
-      method: "PUT",
-      onSuccess: () => {
-        refetchHistory()
-        setSelectedHistoryId("")
-        setReviewAccuracy("")
-      },
-    },
-  )
+  const { mutate: updateReviewAccuracy, loading: accuracyLoading } = useApiMutation()
 
-  const handleUpdateAccuracy = () => {
+  const handleUpdateAccuracy = async () => {
     if (!selectedHistoryId || !reviewAccuracy) return
 
-    updateReviewAccuracy({
-      reviewAccuracy: reviewAccuracy === "clear" ? null : reviewAccuracy,
-    })
+    try {
+      await updateReviewAccuracy(`/orders/history/${selectedHistoryId}/review-accuracy`, {
+        method: "PUT",
+        body: {
+          reviewAccuracy: reviewAccuracy === "clear" ? null : reviewAccuracy,
+        },
+      })
+      refetchHistory()
+      setSelectedHistoryId("")
+      setReviewAccuracy("")
+    } catch (error) {
+      console.error("Failed to update review accuracy:", error)
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -172,7 +172,7 @@ export default function TestPage() {
       </Card>
 
       {/* Update Review Accuracy */}
-      {orderHistory?.data?.history?.length > 0 && (
+      {(orderHistory?.data?.history?.length ?? 0) > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>3. Update Review Accuracy (PUT /api/orders/history/:historyId/review-accuracy)</CardTitle>
