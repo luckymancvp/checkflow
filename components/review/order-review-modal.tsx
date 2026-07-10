@@ -101,6 +101,8 @@ export function OrderReviewModal({
   const { preloadOrderImages, getCachedImageUrl } = useImageCache()
   const designUrls = useDesignLinks(order.designLink)
   const [designIndex, setDesignIndex] = useState(0)
+  const mockupUrls = useDesignLinks(order.mockup)
+  const [mockupIndex, setMockupIndex] = useState(0)
 
   const { reviewingUsers, setTypingStatus } = useOrderReviewPresence(order.itemId, isOpen)
   // const { onlineUsers } = useGlobalPresence(isOpen)
@@ -231,6 +233,7 @@ export function OrderReviewModal({
     setZoom(100)
     setActiveTab("mockup")
     setDesignIndex(0)
+    setMockupIndex(0)
     setPanX(0)
     setPanY(0)
     setRotation(0)
@@ -1176,6 +1179,9 @@ export function OrderReviewModal({
                   designUrls={designUrls}
                   designIndex={designIndex}
                   setDesignIndex={setDesignIndex}
+                  mockupUrls={mockupUrls}
+                  mockupIndex={mockupIndex}
+                  setMockupIndex={setMockupIndex}
                 />
               </div>
             </div>

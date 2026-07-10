@@ -16,6 +16,8 @@ interface FloatingImageProps {
   designUrls?: string[]
   designIndex?: number
   setDesignIndex?: (index: number) => void
+  mockupUrls?: string[]
+  mockupIndex?: number
 }
 
 const FLOAT_SETTINGS_KEY = "orderReviewFloatSettings"
@@ -52,9 +54,13 @@ export function FloatingImage({
   designUrls = [],
   designIndex = 0,
   setDesignIndex,
+  mockupUrls = [],
+  mockupIndex = 0,
 }: FloatingImageProps) {
   const safeDesignIndex = designUrls.length > 0 ? Math.min(designIndex, designUrls.length - 1) : 0
   const currentDesignUrl = designUrls[safeDesignIndex] ?? order.designLink ?? null
+  const safeMockupIndex = mockupUrls.length > 0 ? Math.min(mockupIndex, mockupUrls.length - 1) : 0
+  const currentMockupUrl = mockupUrls[safeMockupIndex] ?? order.mockup ?? null
   const [perProductTypeMode, setPerProductTypeMode] = useState(() => {
     try {
       const saved = localStorage.getItem(FLOAT_MODE_KEY)
@@ -140,7 +146,7 @@ export function FloatingImage({
   useEffect(() => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
-  }, [activeTab, order.itemId, safeDesignIndex])
+  }, [activeTab, order.itemId, safeDesignIndex, safeMockupIndex])
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -275,7 +281,7 @@ export function FloatingImage({
       case "product":
         return getImageUrl(order.productImage, "other")
       case "mockup":
-        return getCachedImageUrl(getImageUrl(order.mockup, "mockup"))
+        return getCachedImageUrl(currentMockupUrl)
       case "design":
         return getCachedImageUrl(currentDesignUrl)
       case "customer":
@@ -290,7 +296,7 @@ export function FloatingImage({
       case "product":
         return order.productImage
       case "mockup":
-        return order.mockup
+        return currentMockupUrl
       case "design":
         return currentDesignUrl
       case "customer":
@@ -442,7 +448,7 @@ export function FloatingImage({
           className="flex items-center justify-center"
         >
           <LazyImage
-            key={`${order.itemId}-${activeTab}-${activeTab === "design" ? safeDesignIndex : 0}-float`}
+            key={`${order.itemId}-${activeTab}-${activeTab === "design" ? safeDesignIndex : activeTab === "mockup" ? safeMockupIndex : 0}-float`}
             src={imageSrc}
             alt={activeTab}
             className="max-w-full max-h-full object-contain select-none"
