@@ -152,6 +152,7 @@ export function OrderDetailsPanel({
                     src={getCachedImageUrl(part) || part}
                     alt="Product type note image"
                     className="w-full h-auto object-contain rounded border border-gray-200 cursor-pointer"
+                    fit="contain"
                     onClick={() => window.open(part, "_blank")}
                     fallbackSrc="/placeholder.svg?height=200&width=300&text=Image"
                   />

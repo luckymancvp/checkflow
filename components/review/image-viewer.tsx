@@ -666,6 +666,7 @@ export function ImageViewer({
                     src={img.src}
                     alt={img.label}
                     className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+                    fit="contain"
                     style={{ maxHeight: "500px" }}
                     fallbackSrc={`/placeholder.svg?height=400&width=600&text=${img.label}`}
                   />

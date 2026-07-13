@@ -1039,6 +1039,7 @@ export function OrderReviewModal({
                             src={url}
                             alt={`Order note image ${index + 1}`}
                             className="w-full h-auto object-contain rounded border border-purple-200 cursor-pointer"
+                            fit="contain"
                             onClick={() => window.open(url, "_blank")}
                             fallbackSrc="/placeholder.svg?height=200&width=200&text=Image"
                           />
@@ -1105,6 +1106,7 @@ export function OrderReviewModal({
                               src={getCachedImageUrl(url) || url}
                               alt={`Customer Image ${index + 1}`}
                               className="w-full h-auto object-contain rounded border border-green-200 cursor-pointer"
+                              fit="contain"
                               onClick={() => window.open(url, "_blank")}
                               fallbackSrc="/placeholder.svg?height=200&width=200&text=Customer+Image"
                             />
@@ -1115,6 +1117,7 @@ export function OrderReviewModal({
                           src={getCachedImageUrl(order.customerImage) || order.customerImage}
                           alt="Customer Reference"
                           className="w-full h-auto object-contain rounded border border-green-200 cursor-pointer"
+                          fit="contain"
                           onClick={() => window.open(order.customerImage, "_blank")}
                           fallbackSrc="/placeholder.svg?height=200&width=200&text=Customer+Image"
                         />
