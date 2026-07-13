@@ -452,6 +452,7 @@ export function FloatingImage({
             src={imageSrc}
             alt={activeTab}
             className="max-w-full max-h-full object-contain select-none"
+            fit="contain"
             fallbackSrc={`/placeholder.svg?height=400&width=600&text=${activeTab}`}
             draggable={false}
           />
