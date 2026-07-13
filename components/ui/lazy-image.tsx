@@ -13,6 +13,7 @@ interface LazyImageProps {
   fallbackSrc?: string
   placeholder?: string
   draggable?: boolean
+  fit?: "cover" | "contain"
   onLoad?: () => void
   onError?: () => void
   onClick?: () => void
@@ -26,6 +27,7 @@ export function LazyImage({
   fallbackSrc = "/placeholder.svg?height=48&width=48&text=Image",
   placeholder = "/placeholder.svg?height=48&width=48&text=Loading",
   draggable,
+  fit = "cover",
   onLoad,
   onError,
   onClick,
@@ -110,7 +112,7 @@ export function LazyImage({
   }
 
   return (
-    <div ref={imgRef} className={cn("relative overflow-hidden", className)} style={style} onClick={onClick}>
+    <div ref={imgRef} className={cn("relative overflow-hidden", className)} onClick={onClick}>
       {!isInView ? (
         <img
           src={placeholder || "/placeholder.svg"}
@@ -131,9 +133,11 @@ export function LazyImage({
               src={hasError ? fallbackSrc : resolvedSrc}
               alt={alt}
               className={cn(
-                "w-full h-full object-cover transition-opacity duration-300",
+                "w-full h-full transition-opacity duration-300",
+                fit === "contain" ? "object-contain" : "object-cover",
                 isLoaded ? "opacity-100" : "opacity-0",
               )}
+              style={style}
               draggable={draggable}
               onLoad={handleLoad}
               onError={handleError}
