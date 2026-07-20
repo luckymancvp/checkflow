@@ -21,7 +21,7 @@ function adaptMeraOrderWithItem(order: MeraOrder, item: MeraOrderItem): Order & 
     itemId: item.item_key,
     sheetId: "__mera__",
     status: mapStatus(item.status),
-    orderNote: order.note || undefined,
+    orderNote: item.note || order.note || undefined,
     designer: item.designer?.name || order.designer?.name || undefined,
     designLink: item.design_link || undefined,
     mockup: item.mockup_link || order.mockup_link || undefined,

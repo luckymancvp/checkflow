@@ -74,6 +74,7 @@ export interface MeraOrderItem {
   order_id: string
   etsy_line_item_id: string
   status: string
+  note: string
   provider: string
   material: string
   image_link: string
