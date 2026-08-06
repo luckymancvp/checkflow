@@ -1,9 +1,15 @@
 "use client"
 
-import { useState, useRef, useEffect, type CSSProperties } from "react"
+import { useEffect, useRef, useState, type CSSProperties } from "react"
 import { cn } from "@/lib/utils"
-import { googleSheetsClient } from "@/lib/google-sheets-client"
-import { GoogleDriveClient } from "@/lib/google-drive-client"
+import {
+  PREVIEW_SIZE,
+  clearImageToken,
+  extractDriveFileId,
+  getImageToken,
+  isDriveUrl,
+  peekDriveImageUrl,
+} from "@/lib/drive-image"
 
 interface LazyImageProps {
   src: string
@@ -14,10 +20,16 @@ interface LazyImageProps {
   placeholder?: string
   draggable?: boolean
   fit?: "cover" | "contain"
+  /** Skip the viewport check and start loading immediately (for images known to be visible). */
+  eager?: boolean
+  /** Width of the cheap preview shown while the original downloads. */
+  previewSize?: number
   onLoad?: () => void
   onError?: () => void
   onClick?: () => void
 }
+
+const MAX_RETRIES = 2
 
 export function LazyImage({
   src,
@@ -28,62 +40,34 @@ export function LazyImage({
   placeholder = "/placeholder.svg?height=48&width=48&text=Loading",
   draggable,
   fit = "cover",
+  eager = false,
+  previewSize = PREVIEW_SIZE,
   onLoad,
   onError,
   onClick,
 }: LazyImageProps) {
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [isInView, setIsInView] = useState(false)
+  const [isInView, setIsInView] = useState(eager)
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
+  const [fullSrc, setFullSrc] = useState<string | null>(null)
+  const [isFullReady, setIsFullReady] = useState(false)
+  const [isDisplayLoaded, setIsDisplayLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
-  const [resolvedSrc, setResolvedSrc] = useState<string>(src)
-  const [isResolvingSrc, setIsResolvingSrc] = useState(false)
-  const imgRef = useRef<HTMLImageElement>(null)
-  const fetchInitiatedRef = useRef<boolean>(false)
+  const [reloadNonce, setReloadNonce] = useState(0)
 
-  const isGoogleDriveUrl = (url: string): boolean => {
-    return url.includes("drive.google.com")
+  const containerRef = useRef<HTMLDivElement>(null)
+  const retryCountRef = useRef(0)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSrcRef = useRef<string | null>(null)
+
+  // A different image means a fresh retry budget.
+  if (lastSrcRef.current !== src) {
+    lastSrcRef.current = src
+    retryCountRef.current = 0
   }
 
   useEffect(() => {
-    if (!isInView || !isGoogleDriveUrl(src) || fetchInitiatedRef.current) return
+    if (eager) return
 
-    const fetchDriveFile = async () => {
-      fetchInitiatedRef.current = true
-      setIsResolvingSrc(true)
-
-      console.log("[v0] LazyImage: Starting fetch for", src)
-
-      try {
-        const accessToken = await googleSheetsClient.getValidAccessToken()
-        const driveClient = new GoogleDriveClient({ accessToken })
-        const objectUrl = await driveClient.fetchFileAsObjectUrl(src)
-
-        setResolvedSrc(objectUrl)
-        console.log("[v0] LazyImage: Successfully resolved", src)
-      } catch (error) {
-        console.error("[LazyImage] Failed to fetch Google Drive file:", error)
-        setHasError(true)
-      } finally {
-        setIsResolvingSrc(false)
-      }
-    }
-
-    fetchDriveFile()
-  }, [isInView, src])
-
-  useEffect(() => {
-    fetchInitiatedRef.current = false
-    setIsLoaded(false)
-    setHasError(false)
-
-    if (!isGoogleDriveUrl(src)) {
-      setResolvedSrc(src)
-    }
-  }, [src])
-
-  // This allows blob URLs to persist when modal closes and reopens
-
-  useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -91,59 +75,191 @@ export function LazyImage({
           observer.disconnect()
         }
       },
-      { threshold: 0.1 },
+      // Start fetching before the image scrolls into view, and use threshold 0 so a
+      // container that has not been laid out yet still triggers.
+      { threshold: 0, rootMargin: "600px" },
     )
 
-    if (imgRef.current) {
-      observer.observe(imgRef.current)
-    }
+    if (containerRef.current) observer.observe(containerRef.current)
 
     return () => observer.disconnect()
+  }, [eager])
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+    }
   }, [])
 
-  const handleLoad = () => {
-    setIsLoaded(true)
-    onLoad?.()
+  // Resolve `src` into the URLs we actually render. Reset and resolve live in the same
+  // effect so a stale flag can never suppress the fetch for a newly assigned src.
+  useEffect(() => {
+    let cancelled = false
+
+    setIsFullReady(false)
+    setIsDisplayLoaded(false)
+    setHasError(false)
+    setPreviewSrc(null)
+    setFullSrc(null)
+
+    if (!src || !isInView) return
+
+    if (!isDriveUrl(src)) {
+      setFullSrc(reloadNonce > 0 ? `${src}${src.includes("?") ? "&" : "?"}r=${reloadNonce}` : src)
+      return
+    }
+
+    // A Drive link we cannot turn into a file id (a folder link, say) is not displayable.
+    if (!extractDriveFileId(src)) {
+      setHasError(true)
+      onError?.()
+      return
+    }
+
+    const resolve = async () => {
+      try {
+        // Ensures the token exists so both URLs can be built synchronously below.
+        await getImageToken()
+        if (cancelled) return
+
+        const preview = peekDriveImageUrl(src, { size: previewSize, attempt: reloadNonce })
+        const full = peekDriveImageUrl(src, { attempt: reloadNonce })
+        if (!full) throw new Error("Could not build a Drive image URL")
+
+        setPreviewSrc(preview)
+        setFullSrc(full)
+      } catch (error) {
+        console.error("[LazyImage] Failed to prepare Drive image URL:", error)
+        if (!cancelled) {
+          setHasError(true)
+          onError?.()
+        }
+      }
+    }
+
+    resolve()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, isInView, reloadNonce, previewSize])
+
+  const scheduleRetry = () => {
+    if (retryCountRef.current >= MAX_RETRIES) return false
+
+    retryCountRef.current += 1
+    const attempt = retryCountRef.current
+
+    retryTimerRef.current = setTimeout(() => {
+      // A repeat failure is most often an expired image token — drop it and re-mint.
+      if (attempt > 1) clearImageToken()
+      setReloadNonce((n) => n + 1)
+    }, 400 * attempt)
+
+    return true
   }
 
-  const handleError = () => {
+  const failPermanently = () => {
     setHasError(true)
     onError?.()
   }
 
+  // Load the original off-screen so the preview stays on screen until it is ready —
+  // swapping to an already-decoded image avoids any flash.
+  useEffect(() => {
+    if (!isInView || !fullSrc) return
+
+    if (!previewSrc) {
+      setIsFullReady(true)
+      return
+    }
+
+    let cancelled = false
+    const loader = new Image()
+
+    loader.onload = () => {
+      if (!cancelled) setIsFullReady(true)
+    }
+    loader.onerror = () => {
+      if (cancelled) return
+      if (!scheduleRetry()) failPermanently()
+    }
+    loader.src = fullSrc
+
+    return () => {
+      cancelled = true
+      loader.onload = null
+      loader.onerror = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullSrc, previewSrc, isInView])
+
+  const handleManualRetry = () => {
+    retryCountRef.current = 0
+    clearImageToken()
+    setReloadNonce((n) => n + 1)
+  }
+
+  const handleVisibleError = () => {
+    // The preview failed (some Drive files have no thumbnail) — fall through to the original.
+    if (previewSrc && !isFullReady) {
+      setPreviewSrc(null)
+      return
+    }
+    if (!scheduleRetry()) failPermanently()
+  }
+
+  const displaySrc = hasError ? fallbackSrc : isFullReady || !previewSrc ? fullSrc : previewSrc
+  const isShowingPreview = !hasError && !!previewSrc && !isFullReady
+  const showPlaceholder = !hasError && (!isInView || !displaySrc || !isDisplayLoaded)
+
   return (
-    <div ref={imgRef} className={cn("relative overflow-hidden", className)} onClick={onClick}>
-      {!isInView ? (
+    <div ref={containerRef} className={cn("relative overflow-hidden", className)} onClick={onClick}>
+      {showPlaceholder && (
         <img
           src={placeholder || "/placeholder.svg"}
           alt="Loading..."
-          className="w-full h-full object-cover opacity-50"
+          className={cn("w-full h-full object-cover opacity-50", displaySrc && "absolute inset-0")}
         />
-      ) : (
-        <>
-          {(!isLoaded || isResolvingSrc) && (
-            <img
-              src={placeholder || "/placeholder.svg"}
-              alt="Loading..."
-              className="absolute inset-0 w-full h-full object-cover opacity-50"
-            />
+      )}
+
+      {displaySrc && (
+        <img
+          src={displaySrc}
+          alt={alt}
+          className={cn(
+            "w-full h-full transition-opacity duration-300",
+            fit === "contain" ? "object-contain" : "object-cover",
+            isDisplayLoaded ? "opacity-100" : "opacity-0",
           )}
-          {!isResolvingSrc && (
-            <img
-              src={hasError ? fallbackSrc : resolvedSrc}
-              alt={alt}
-              className={cn(
-                "w-full h-full transition-opacity duration-300",
-                fit === "contain" ? "object-contain" : "object-cover",
-                isLoaded ? "opacity-100" : "opacity-0",
-              )}
-              style={style}
-              draggable={draggable}
-              onLoad={handleLoad}
-              onError={handleError}
-            />
-          )}
-        </>
+          style={style}
+          draggable={draggable}
+          onLoad={() => {
+            setIsDisplayLoaded(true)
+            onLoad?.()
+          }}
+          onError={handleVisibleError}
+        />
+      )}
+
+      {isShowingPreview && isDisplayLoaded && (
+        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+          Preview…
+        </span>
+      )}
+
+      {hasError && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleManualRetry()
+          }}
+          className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-black/85"
+        >
+          Tải lại
+        </button>
       )}
     </div>
   )
