@@ -16,7 +16,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { OrderReviewModal } from "@/components/review/order-review-modal"
 import { googleSheetsClient } from "@/lib/google-sheets-client"
-import { GoogleDriveClient } from "@/lib/google-drive-client"
+import { clearResolvedDesignLinks } from "@/utils/design-links"
 import { RefreshCw, Database, Sheet } from "lucide-react"
 
 type DataSource = "sheets" | "mera"
@@ -393,12 +393,12 @@ export default function ReviewPage() {
   }
 
   const handleMeraRefresh = () => {
-    GoogleDriveClient.clearCache()
+    clearResolvedDesignLinks()
     meraRefetch()
   }
 
   const handleSheetsRefresh = async () => {
-    GoogleDriveClient.clearCache()
+    clearResolvedDesignLinks()
     await refreshData()
   }
 

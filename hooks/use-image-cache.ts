@@ -1,102 +1,109 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useCallback, useRef } from "react"
 import type { Order } from "@/types/order"
-import { getImageUrl } from "@/utils/image-utils"
-import { googleSheetsClient } from "@/lib/google-sheets-client"
-import { GoogleDriveClient } from "@/lib/google-drive-client"
+import { PREVIEW_SIZE, buildDriveImageUrl, isDriveUrl } from "@/lib/drive-image"
 import { resolveDesignUrls } from "@/utils/design-links"
 
+// Images are served by /api/drive-image with immutable cache headers, so "preloading"
+// just means priming the browser HTTP cache — the <img> that renders later hits the
+// same cache entry. Nothing is held in JS memory any more.
+
+const MAX_PARALLEL_WARMS = 3
+
+// Previews are small, so every image of an upcoming order gets one. Originals are not:
+// only the first design/mockup is fetched ahead, the rest arrive on demand (their
+// preview is already cached, so the switch still feels instant).
+const FULL_PREFETCH_PER_KIND = 1
+
 export function useImageCache() {
-  const [imageCache, setImageCache] = useState<Map<string, string>>(new Map())
-  const blobUrlsRef = useRef<Set<string>>(new Set())
+  const warmedRef = useRef<Set<string>>(new Set())
+  const queueRef = useRef<Array<() => Promise<void>>>([])
+  const activeRef = useRef(0)
 
-  const isGoogleDriveUrl = (url: string): boolean => {
-    return url.includes("drive.google.com")
-  }
-
-  const fetchGoogleDriveFile = async (url: string): Promise<string> => {
-    try {
-      // Get access token from Google Sheets client (same token works for Drive API)
-      const accessToken = await googleSheetsClient.getValidAccessToken()
-
-      const driveClient = new GoogleDriveClient({ accessToken })
-      const objectUrl = await driveClient.fetchFileAsObjectUrl(url)
-
-      return objectUrl
-    } catch (error) {
-      console.error("[useImageCache] Failed to fetch Google Drive file:", error)
-      throw error
+  const drain = useCallback(() => {
+    while (activeRef.current < MAX_PARALLEL_WARMS && queueRef.current.length > 0) {
+      const task = queueRef.current.shift()!
+      activeRef.current += 1
+      task().finally(() => {
+        activeRef.current -= 1
+        drain()
+      })
     }
-  }
+  }, [])
+
+  const warm = useCallback(
+    (url: string, size?: number) => {
+      if (!isDriveUrl(url)) return
+
+      const key = `${url}|${size ?? "full"}`
+      if (warmedRef.current.has(key)) return
+      warmedRef.current.add(key)
+
+      queueRef.current.push(async () => {
+        try {
+          const proxyUrl = await buildDriveImageUrl(url, size ? { size } : undefined)
+          if (!proxyUrl) return
+
+          const response = await fetch(proxyUrl, { cache: "force-cache" })
+          if (!response.ok) {
+            warmedRef.current.delete(key)
+            return
+          }
+
+          // Drain the body so the response actually lands in the HTTP cache.
+          await response.arrayBuffer()
+        } catch (error) {
+          warmedRef.current.delete(key)
+          console.error("[useImageCache] Failed to warm image:", url, error)
+        }
+      })
+
+      drain()
+    },
+    [drain],
+  )
 
   const preloadOrderImages = useCallback(
     async (orderToPreload: Order) => {
-      // Both mockup and designLink can hold multiple URLs and/or folder links — expand to individual files
+      // Both fields can hold several links and/or folder links — expand to single files.
       const [mockupUrls, designUrls] = await Promise.all([
-        resolveDesignUrls(orderToPreload.mockup).catch((error) => {
-          console.error("[useImageCache] Failed to resolve mockup links:", error)
-          return [] as string[]
-        }),
-        resolveDesignUrls(orderToPreload.designLink).catch((error) => {
-          console.error("[useImageCache] Failed to resolve design links:", error)
-          return [] as string[]
-        }),
+        resolveDesignUrls(orderToPreload.mockup).catch(() => [] as string[]),
+        resolveDesignUrls(orderToPreload.designLink).catch(() => [] as string[]),
       ])
 
-      const imagesToPreload = [
-        ...mockupUrls.map((url) => ({ url, type: "mockup" })),
-        ...designUrls.map((url) => ({ url, type: "design" })),
-      ]
-
-      for (const { url, type } of imagesToPreload) {
-        if (!url) continue
-        if (!isGoogleDriveUrl(url)) continue
-
-        console.log(`[v0] Preloading ${type} image for next order:`, orderToPreload.itemId)
-
-        if (!imageCache.has(url)) {
-          try {
-            const objectUrl = await fetchGoogleDriveFile(url)
-
-            blobUrlsRef.current.add(objectUrl)
-            setImageCache((prev) => new Map(prev).set(url, objectUrl))
-            console.log(`[v0] Cached ${type} image for order ${orderToPreload.itemId}`)
-          } catch (error) {
-            console.log(`[v0] Failed to cache ${type} image for order ${orderToPreload.itemId}:`, error)
-          }
-        }
-      }
-    },
-    [imageCache],
-  )
-
-  const getCachedImageUrl = useCallback(
-    (originalUrl: string | null | undefined): string | null => {
-      if (!originalUrl) return null
-
-      const cachedUrl = imageCache.get(originalUrl) || null
-
-      if (isGoogleDriveUrl(originalUrl)) {
-        /*if (cachedUrl) {
-          console.log("ImageCache hit:", { originalUrl, cachedUrl })
-        } else {
-          console.log("ImageCache miss:", { originalUrl })
-        }*/
+      for (const url of [...mockupUrls, ...designUrls]) {
+        warm(url, PREVIEW_SIZE)
       }
 
-      return cachedUrl || originalUrl
+      for (const url of mockupUrls.slice(0, FULL_PREFETCH_PER_KIND)) {
+        warm(url)
+      }
+      for (const url of designUrls.slice(0, FULL_PREFETCH_PER_KIND)) {
+        warm(url)
+      }
     },
-    [imageCache],
+    [warm],
   )
 
-  // GoogleDriveClient manages the cache lifecycle, allowing reuse when modal reopens
-  // Blob URLs will persist across modal open/close cycles
+  const preloadOrders = useCallback(
+    async (orders: Array<Order | undefined>) => {
+      for (const order of orders) {
+        if (order) await preloadOrderImages(order)
+      }
+    },
+    [preloadOrderImages],
+  )
+
+  // Kept for call sites that used to swap in a blob URL; LazyImage now resolves Drive
+  // links itself, so the original URL is what should be handed to it.
+  const getCachedImageUrl = useCallback((originalUrl: string | null | undefined): string | null => {
+    return originalUrl || null
+  }, [])
 
   return {
-    imageCache,
     preloadOrderImages,
+    preloadOrders,
     getCachedImageUrl,
-    fetchGoogleDriveFile, // Export for on-demand fetching
   }
 }

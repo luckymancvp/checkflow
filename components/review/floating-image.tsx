@@ -451,6 +451,7 @@ export function FloatingImage({
             key={`${order.itemId}-${activeTab}-${activeTab === "design" ? safeDesignIndex : activeTab === "mockup" ? safeMockupIndex : 0}-float`}
             src={imageSrc}
             alt={activeTab}
+            eager
             className="max-w-full max-h-full object-contain select-none"
             fit="contain"
             fallbackSrc={`/placeholder.svg?height=400&width=600&text=${activeTab}`}

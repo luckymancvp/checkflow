@@ -96,9 +96,8 @@ export function OrderReviewModal({
   const [sheetGid, setSheetGid] = useState<string | null>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const orderNoteTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const prefetchInProgressRef = useRef(false)
 
-  const { preloadOrderImages, getCachedImageUrl } = useImageCache()
+  const { preloadOrders, getCachedImageUrl } = useImageCache()
   const designUrls = useDesignLinks(order.designLink)
   const [designIndex, setDesignIndex] = useState(0)
   const mockupUrls = useDesignLinks(order.mockup)
@@ -252,27 +251,16 @@ export function OrderReviewModal({
   }, [order.itemId, order.orderNote, order._changes, order._itemIdChanged])
 
   useEffect(() => {
-    if (!reviewMode || prefetchInProgressRef.current) return
+    if (!reviewMode) return
 
-    const nextIndex = reviewMode.currentIndex + 1
-    if (nextIndex >= reviewMode.orders.length) return
+    const index = reviewMode.currentIndex
 
-    const nextOrder = reviewMode.orders[nextIndex]
-
-    const preloadNext = async () => {
-      prefetchInProgressRef.current = true
-      try {
-        console.log("[v0] Preloading images for next order:", nextOrder.itemId)
-        await preloadOrderImages(nextOrder)
-      } catch (error) {
-        console.error("[v0] Failed to preload images for next order:", error)
-      } finally {
-        prefetchInProgressRef.current = false
-      }
-    }
-
-    preloadNext()
-  }, [reviewMode, currentIndex, preloadOrderImages])
+    // The current order first — that warms its remaining designs/mockups, so paging
+    // through them is instant — then the two orders after it.
+    preloadOrders([reviewMode.orders[index], reviewMode.orders[index + 1], reviewMode.orders[index + 2]]).catch(
+      (error) => console.error("[OrderReviewModal] Failed to preload images:", error),
+    )
+  }, [reviewMode, currentIndex, preloadOrders])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -522,8 +510,8 @@ export function OrderReviewModal({
       const container = imageContainerRef.current
       const containerRect = container.getBoundingClientRect()
 
-      // Find the image element
-      const imgElement = container.querySelector("img")
+      // Find the image element (skipping the loading placeholder LazyImage may still show)
+      const imgElement = container.querySelector<HTMLImageElement>("img:not([alt='Loading...'])")
       if (!imgElement) return
 
       // Get the actual rendered image dimensions and position
@@ -543,7 +531,13 @@ export function OrderReviewModal({
 
       // Create a new image to draw on canvas
       const img = new Image()
-      img.crossOrigin = "anonymous"
+      // Drive images come through our own origin now, so requesting CORS would only
+      // force a second download into a different cache partition.
+      if (new URL(imgElement.src, window.location.href).origin !== window.location.origin) {
+        img.crossOrigin = "anonymous"
+      }
+
+      img.onerror = () => console.error("Failed to load image for screenshot")
 
       img.onload = () => {
         const scaleX = img.naturalWidth / imgRect.width

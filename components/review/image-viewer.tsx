@@ -200,8 +200,8 @@ export function ImageViewer({
       const container = imageContainerRef.current
       const containerRect = container.getBoundingClientRect()
 
-      // Find the image element
-      const imgElement = container.querySelector("img")
+      // Find the image element (skipping the loading placeholder LazyImage may still show)
+      const imgElement = container.querySelector<HTMLImageElement>("img:not([alt='Loading...'])")
       if (!imgElement) return
 
       // Get the actual rendered image dimensions and position
@@ -221,7 +221,11 @@ export function ImageViewer({
 
       // Create a new image to draw on canvas
       const img = new Image()
-      img.crossOrigin = "anonymous"
+      // Drive images come through our own origin now, so requesting CORS would only
+      // force a second download into a different cache partition.
+      if (new URL(imgElement.src, window.location.href).origin !== window.location.origin) {
+        img.crossOrigin = "anonymous"
+      }
 
       img.onload = () => {
         const scaleX = img.naturalWidth / imgRect.width
@@ -351,6 +355,7 @@ export function ImageViewer({
                     key={`${order.itemId}-${activeImage.key}${activeImage.key === "design" ? `-${safeDesignIndex}` : activeImage.key === "mockup" ? `-${safeMockupIndex}` : ""}`}
                     src={activeImage.src}
                     alt={activeImage.label}
+                    eager
                     className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
                     style={{
                       maxWidth: "90vw",
@@ -516,6 +521,7 @@ export function ImageViewer({
                     key={`${order.itemId}-${activeImage.key}${activeImage.key === "design" ? `-${safeDesignIndex}` : activeImage.key === "mockup" ? `-${safeMockupIndex}` : ""}`}
                     src={activeImage.src}
                     alt={activeImage.label}
+                    eager
                     className="max-w-none max-h-none w-auto h-auto rounded-lg shadow-lg select-none"
                     style={{
                       maxWidth: "90vw",

@@ -53,3 +53,10 @@ export function resolveDesignUrls(raw?: string | null): Promise<string[]> {
   resolvedCache.set(cacheKey, promise)
   return promise
 }
+
+// Manual refresh should re-read folders, otherwise files added after the first
+// expansion stay invisible until a full page reload.
+export function clearResolvedDesignLinks() {
+  resolvedCache.clear()
+  GoogleDriveClient.clearCache()
+}
