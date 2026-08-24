@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from "react"
 import type { Order } from "@/types/order"
-import { PREVIEW_SIZE, buildDriveImageUrl, isDriveUrl } from "@/lib/drive-image"
+import { FULL_SIZE, PREVIEW_SIZE, buildDriveImageUrl, isDriveUrl } from "@/lib/drive-image"
 import { resolveDesignUrls } from "@/utils/design-links"
 
 // Images are served by /api/drive-image with immutable cache headers, so "preloading"
@@ -11,8 +11,8 @@ import { resolveDesignUrls } from "@/utils/design-links"
 
 const MAX_PARALLEL_WARMS = 3
 
-// Previews are small, so every image of an upcoming order gets one. Originals are not:
-// only the first design/mockup is fetched ahead, the rest arrive on demand (their
+// Previews are small, so every image of an upcoming order gets one. Full renders are
+// not: only the first design/mockup is fetched ahead, the rest arrive on demand (their
 // preview is already cached, so the switch still feels instant).
 const FULL_PREFETCH_PER_KIND = 1
 
@@ -77,10 +77,10 @@ export function useImageCache() {
       }
 
       for (const url of mockupUrls.slice(0, FULL_PREFETCH_PER_KIND)) {
-        warm(url)
+        warm(url, FULL_SIZE)
       }
       for (const url of designUrls.slice(0, FULL_PREFETCH_PER_KIND)) {
-        warm(url)
+        warm(url, FULL_SIZE)
       }
     },
     [warm],
