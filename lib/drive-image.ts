@@ -13,6 +13,14 @@ const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000
 
 export const PREVIEW_SIZE = 1600
 
+// Both the preview and the "full" image are rendered by Google, never the raw bytes
+// off Drive. That matters for colour: originals are often CMYK or carry a non-sRGB ICC
+// profile, and Chrome renders those differently than Drive's own preview does — so the
+// same file looked different on the web than on Drive, and shifted mid-load when the
+// preview swapped for the original. Going through one pipeline for both keeps the web
+// matching what the designer sees on Drive.
+export const FULL_SIZE = 4096
+
 interface StoredToken {
   token: string
   expiresAt: number

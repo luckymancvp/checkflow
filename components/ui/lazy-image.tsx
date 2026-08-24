@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import { cn } from "@/lib/utils"
 import {
+  FULL_SIZE,
   PREVIEW_SIZE,
   clearImageToken,
   extractDriveFileId,
@@ -22,8 +23,10 @@ interface LazyImageProps {
   fit?: "cover" | "contain"
   /** Skip the viewport check and start loading immediately (for images known to be visible). */
   eager?: boolean
-  /** Width of the cheap preview shown while the original downloads. */
+  /** Width of the cheap preview shown while the larger render downloads. */
   previewSize?: number
+  /** Width of the final render shown once it has loaded. */
+  fullSize?: number
   onLoad?: () => void
   onError?: () => void
   onClick?: () => void
@@ -42,6 +45,7 @@ export function LazyImage({
   fit = "cover",
   eager = false,
   previewSize = PREVIEW_SIZE,
+  fullSize = FULL_SIZE,
   onLoad,
   onError,
   onClick,
@@ -123,7 +127,7 @@ export function LazyImage({
         if (cancelled) return
 
         const preview = peekDriveImageUrl(src, { size: previewSize, attempt: reloadNonce })
-        const full = peekDriveImageUrl(src, { attempt: reloadNonce })
+        const full = peekDriveImageUrl(src, { size: fullSize, attempt: reloadNonce })
         if (!full) throw new Error("Could not build a Drive image URL")
 
         setPreviewSrc(preview)
@@ -143,7 +147,7 @@ export function LazyImage({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, isInView, reloadNonce, previewSize])
+  }, [src, isInView, reloadNonce, previewSize, fullSize])
 
   const scheduleRetry = () => {
     if (retryCountRef.current >= MAX_RETRIES) return false

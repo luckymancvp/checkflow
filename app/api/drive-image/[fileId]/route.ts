@@ -7,7 +7,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 const FILE_ID_PATTERN = /^[a-zA-Z0-9_-]{8,}$/
-const ALLOWED_SIZES = [400, 800, 1600, 2560]
+const ALLOWED_SIZES = [400, 800, 1600, 2560, 4096]
 
 // Bytes for a given (fileId, size) never change, and the token in the URL keeps the
 // cache entry scoped to one user — so the browser may keep it indefinitely.
@@ -26,7 +26,7 @@ function resizeThumbnailLink(link: string, size: number) {
   return link.replace(/=[-\w]+$/, `=s${size}`)
 }
 
-async function fetchFromDrive(fileId: string, size: number | null, accessToken: string) {
+async function fetchFromDrive(fileId: string, size: number | null, accessToken: string): Promise<Response> {
   const response = await fetch(upstreamUrl(fileId, size), {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
@@ -36,7 +36,10 @@ async function fetchFromDrive(fileId: string, size: number | null, accessToken: 
   if (!response.ok) return response
 
   const meta = await response.json()
-  if (!meta.thumbnailLink) return null
+
+  // Files Drive never generated a thumbnail for (too large, unsupported format) still
+  // have to render — serve the original bytes rather than failing the request.
+  if (!meta.thumbnailLink) return fetchFromDrive(fileId, null, accessToken)
 
   // The thumbnail host serves the bytes off Google's CDN and needs no auth header.
   return fetch(resizeThumbnailLink(meta.thumbnailLink, size))
@@ -72,15 +75,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     let upstream = await fetchFromDrive(fileId, size, accessToken)
 
     // A rejected token usually means our cached copy went stale — refresh once.
-    if (upstream && upstream.status === 401) {
+    if (upstream.status === 401) {
       invalidateDriveAccessToken(userId)
       accessToken = await getDriveAccessToken(userId)
       upstream = await fetchFromDrive(fileId, size, accessToken)
-    }
-
-    // No thumbnail available for this file — let the caller fall back to the original.
-    if (!upstream) {
-      return NextResponse.json({ error: "No thumbnail available" }, { status: 404 })
     }
 
     if (!upstream.ok) {
