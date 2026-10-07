@@ -32,7 +32,7 @@ export function adaptMeraOrderWithItem(order: MeraOrder, item: MeraOrderItem): O
     productImage: item.image_link || undefined,
     productType: item.product_type || undefined,
     productName: item.product_name || undefined,
-    country: order.shipping?.country || undefined,
+    country: item.shipping?.country || order.shipping?.country || undefined,
     channel: order.channel || undefined,
     shopId: order.shop_id || undefined,
     sourceLink: item.source_link || order.source_link || undefined,
@@ -75,8 +75,9 @@ export function adaptMeraOrder(order: MeraOrder): Order & { _mera: MeraOrder } {
 export function adaptMeraOrders(orders: MeraOrder[]): Array<Order & { _mera: MeraOrder }> {
   const result: Array<Order & { _mera: MeraOrder }> = []
   for (const order of orders) {
-    if (order.is_split_items && order.items && order.items.length > 0) {
-      // Expand each item into its own CheckFlow entry
+    if (order.items && order.items.length > 0) {
+      // Expand each item into its own CheckFlow entry — status lives on the item, so an
+      // unsplit multi-item order must still expose every item (status_counts are per item)
       for (const item of order.items) {
         result.push(adaptMeraOrderWithItem(order, item))
       }
